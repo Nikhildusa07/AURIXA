@@ -17,19 +17,33 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    user_id = decode_access_token(credentials.credentials)
 
-    if user_id is None:
+    token_data = decode_access_token(credentials.credentials)
+
+    if token_data is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired access token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    try:
-        user_uuid = UUID(user_id)
+    # decode_access_token() may return the JWT payload dictionary
+    if isinstance(token_data, dict):
+        user_id = token_data.get("sub") or token_data.get("user_id")
+    else:
+        user_id = token_data
 
-    except (ValueError, TypeError):
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user identity in access token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user_uuid = UUID(str(user_id))
+
+    except (ValueError, TypeError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user identity in access token",
@@ -59,6 +73,7 @@ async def get_current_user(
 async def get_current_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
+
     if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -2,64 +2,119 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, init_database
 from app.core.security import hash_password
 from app.models.models import User
 
 
 ADMIN_EMAIL = "admin@aurixa.com"
-ADMIN_PASSWORD = "Admin@12345"
-ADMIN_NAME = "AURIXA Administrator"
+ADMIN_PASSWORD = "Admin@123456"
+ADMIN_NAME = "AURIXA Admin"
+
+USER_EMAIL = "user@aurixa.com"
+USER_PASSWORD = "User@123456"
+USER_NAME = "AURIXA User"
 
 
-async def create_admin() -> None:
+async def create_users():
+    # Ensure database tables exist
+    await init_database()
+
     async with AsyncSessionLocal() as db:
 
-        existing_user = await db.scalar(
+        # ============================================================
+        # CREATE ADMIN
+        # ============================================================
+
+        admin = await db.scalar(
             select(User).where(
                 User.email == ADMIN_EMAIL
             )
         )
 
-        if existing_user:
-            # Reset existing user's password and admin permissions
-            existing_user.password_hash = hash_password(
-                ADMIN_PASSWORD
+        if admin is None:
+            admin = User(
+                email=ADMIN_EMAIL,
+                full_name=ADMIN_NAME,
+                password_hash=hash_password(
+                    ADMIN_PASSWORD
+                ),
+                status="active",
+                is_admin=True,
             )
-            existing_user.full_name = ADMIN_NAME
-            existing_user.is_admin = True
-            existing_user.status = "active"
 
-            await db.commit()
+            db.add(admin)
 
             print(
-                f"Admin updated successfully: "
-                f"{ADMIN_EMAIL}"
-            )
-            print(
-                f"Password reset successfully."
+                f"Admin created: {ADMIN_EMAIL}"
             )
 
-            return
-
-        admin = User(
-            email=ADMIN_EMAIL,
-            full_name=ADMIN_NAME,
-            password_hash=hash_password(
+        else:
+            admin.full_name = ADMIN_NAME
+            admin.password_hash = hash_password(
                 ADMIN_PASSWORD
-            ),
-            status="active",
-            is_admin=True,
+            )
+            admin.status = "active"
+            admin.is_admin = True
+
+            print(
+                f"Admin already exists. Updated: {ADMIN_EMAIL}"
+            )
+
+        # ============================================================
+        # CREATE NORMAL USER
+        # ============================================================
+
+        user = await db.scalar(
+            select(User).where(
+                User.email == USER_EMAIL
+            )
         )
 
-        db.add(admin)
+        if user is None:
+            user = User(
+                email=USER_EMAIL,
+                full_name=USER_NAME,
+                password_hash=hash_password(
+                    USER_PASSWORD
+                ),
+                status="active",
+                is_admin=False,
+            )
+
+            db.add(user)
+
+            print(
+                f"User created: {USER_EMAIL}"
+            )
+
+        else:
+            user.full_name = USER_NAME
+            user.password_hash = hash_password(
+                USER_PASSWORD
+            )
+            user.status = "active"
+            user.is_admin = False
+
+            print(
+                f"User already exists. Updated: {USER_EMAIL}"
+            )
+
         await db.commit()
 
-        print(
-            f"Admin created successfully: "
-            f"{ADMIN_EMAIL}"
-        )
+        print("\n================================")
+        print("AURIXA USERS READY")
+        print("================================")
+        print()
+        print("ADMIN")
+        print(f"Email: {ADMIN_EMAIL}")
+        print(f"Password: {ADMIN_PASSWORD}")
+        print()
+        print("NORMAL USER")
+        print(f"Email: {USER_EMAIL}")
+        print(f"Password: {USER_PASSWORD}")
+        print("================================")
 
 
 if __name__ == "__main__":
-    asyncio.run(create_admin())
+    asyncio.run(create_users())
