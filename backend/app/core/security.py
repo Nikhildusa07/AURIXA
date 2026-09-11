@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -29,7 +30,6 @@ def hash_password(password: str) -> str:
         raise ValueError("Password cannot be empty")
 
     # bcrypt supports a maximum of 72 bytes.
-    # We explicitly validate instead of silently truncating.
     if len(password.encode("utf-8")) > 72:
         raise ValueError(
             "Password cannot be longer than 72 bytes"
@@ -56,10 +56,14 @@ def verify_password(
     if len(plain_password.encode("utf-8")) > 72:
         return False
 
-    return pwd_context.verify(
-        plain_password,
-        hashed_password,
-    )
+    try:
+        return pwd_context.verify(
+            plain_password,
+            hashed_password,
+        )
+
+    except Exception:
+        return False
 
 
 # ============================================================
@@ -91,9 +95,12 @@ def create_access_token(subject: str) -> str:
 # DECODE JWT ACCESS TOKEN
 # ============================================================
 
-def decode_access_token(token: str) -> dict:
+def decode_access_token(token: str) -> Optional[str]:
     """
     Decode and validate a JWT access token.
+
+    Returns the user ID stored in the JWT 'sub' claim.
+    Returns None if the token is invalid or expired.
     """
 
     try:
@@ -103,7 +110,12 @@ def decode_access_token(token: str) -> dict:
             algorithms=[settings.ALGORITHM],
         )
 
-        return payload
+        user_id = payload.get("sub")
+
+        if not user_id:
+            return None
+
+        return str(user_id)
 
     except JWTError:
-        return {}
+        return None
