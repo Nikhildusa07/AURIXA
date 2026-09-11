@@ -1,6 +1,14 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+// ========================================
+// API CONFIGURATION
+// ========================================
+
+// Uses VITE_API_URL from .env if available.
+// Falls back to your deployed Render backend.
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://aurixa-k22m.onrender.com/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -183,12 +191,7 @@ export const uploadDocument = async (file) => {
 
   const response = await api.post(
     "/documents/ingest",
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
+    formData
   );
 
   return response.data;
@@ -237,5 +240,9 @@ export const getAuditLogs = async () => {
   const response = await api.get("/audit-logs");
   return response.data;
 };
+
+// ========================================
+// EXPORT
+// ========================================
 
 export default api;
