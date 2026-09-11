@@ -1,33 +1,42 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.agents import router as agents_router
 from app.api.analytics import router as analytics_router
 from app.api.approvals import router as approvals_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.auth import router as auth_router
+from app.api.background_jobs import router as background_jobs_router
 from app.api.documents import router as documents_router
+from app.api.feedback import router as feedback_router
 from app.api.monitoring import router as monitoring_router
 from app.api.requests import router as requests_router
 from app.api.tools import router as tools_router
 from app.api.workflows import router as workflows_router
-from app.api.background_jobs import router as background_jobs_router
-from app.api.feedback import router as feedback_router
 
 from app.core.database import close_database, init_database
 
 
+# ==========================================
+# APPLICATION LIFESPAN
+# ==========================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create database tables when application starts
+    # Create database tables when the application starts
     await init_database()
 
     yield
 
-    # Close database connection when application stops
+    # Close database connections when the application stops
     await close_database()
 
+
+# ==========================================
+# FASTAPI APPLICATION
+# ==========================================
 
 app = FastAPI(
     title="AURIXA",
@@ -41,36 +50,96 @@ app = FastAPI(
 # CORS CONFIGURATION
 # ==========================================
 
-from fastapi.middleware.cors import CORSMiddleware
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Vite local development
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+
+        # Alternative Vite ports
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
+
+        # Alternative local frontend ports
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+
+        # Render deployment
         "https://aurixa-k22m.onrender.com",
     ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # ==========================================
 # API ROUTERS
 # ==========================================
 
-app.include_router(agents_router, prefix="/api/v1")
-app.include_router(workflows_router, prefix="/api/v1")
-app.include_router(approvals_router, prefix="/api/v1")
-app.include_router(tools_router, prefix="/api/v1")
-app.include_router(background_jobs_router, prefix="/api/v1")
-app.include_router(feedback_router, prefix="/api/v1")
-app.include_router(audit_logs_router, prefix="/api/v1")
-app.include_router(monitoring_router, prefix="/api/v1")
-app.include_router(analytics_router, prefix="/api/v1")
-app.include_router(documents_router, prefix="/api/v1")
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(requests_router, prefix="/api/v1")
+app.include_router(
+    agents_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    workflows_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    approvals_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    tools_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    background_jobs_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    feedback_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    audit_logs_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    monitoring_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    analytics_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    documents_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    auth_router,
+    prefix="/api/v1",
+)
+
+app.include_router(
+    requests_router,
+    prefix="/api/v1",
+)
 
 
 # ==========================================
