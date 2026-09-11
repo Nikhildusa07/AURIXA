@@ -6,7 +6,14 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import Approval, Request, WorkflowExecution
+from app.models.models import (
+    Approval,
+    ApprovalStatus,
+    ExecutionStatus,
+    Request,
+    RequestStatus,
+    WorkflowExecution,
+)
 from app.services.audit_service import create_audit_log
 
 
@@ -17,17 +24,17 @@ async def create_approval(
     recommendation: dict[str, Any],
     requested_by: UUID | None = None,
 ) -> Approval:
+
     approval = Approval(
         workflow_execution_id=workflow_execution_id,
         requested_by=requested_by,
-        status="pending",
+        status=ApprovalStatus.PENDING.value,
         reason=reason,
         recommendation=recommendation,
     )
 
     db.add(approval)
-    await db.commit()
-    await db.refresh(approval)
+    await db.flush()
 
     return approval
 
@@ -38,6 +45,7 @@ async def approve_approval(
     reviewed_by: UUID | None = None,
     reviewer_comment: str | None = None,
 ) -> Approval:
+
     approval = await db.get(
         Approval,
         approval_id,
@@ -46,7 +54,7 @@ async def approve_approval(
     if approval is None:
         raise ValueError("Approval not found.")
 
-    if approval.status != "pending":
+    if approval.status != ApprovalStatus.PENDING.value:
         raise ValueError(
             f"Approval cannot be approved. "
             f"Current status: {approval.status}"
@@ -60,28 +68,31 @@ async def approve_approval(
     if execution is None:
         raise ValueError("Workflow execution not found.")
 
-    request = await db.get(
-        Request,
-        execution.request_id,
-    )
+    request = None
 
-    approval.status = "approved"
+    if execution.request_id is not None:
+        request = await db.get(
+            Request,
+            execution.request_id,
+        )
+
+    approval.status = ApprovalStatus.APPROVED.value
     approval.reviewed_by = reviewed_by
     approval.reviewer_comment = reviewer_comment
     approval.reviewed_at = datetime.now(timezone.utc)
 
-    execution.status = "completed"
+    execution.status = ExecutionStatus.COMPLETED.value
     execution.current_step = "completed"
     execution.completed_at = datetime.now(timezone.utc)
 
     execution.state = {
-        **execution.state,
-        "approval_status": "approved",
+        **(execution.state or {}),
+        "approval_status": ApprovalStatus.APPROVED.value,
         "reviewer_comment": reviewer_comment,
     }
 
     if request is not None:
-        request.status = "completed"
+        request.status = RequestStatus.COMPLETED.value
 
         await create_audit_log(
             db=db,
@@ -92,9 +103,11 @@ async def approve_approval(
             entity_id=str(approval.id),
             action="approved",
             details={
+                "request_id": str(request.id),
                 "workflow_execution_id": str(execution.id),
                 "reviewer_comment": reviewer_comment,
-                "workflow_status": "completed",
+                "workflow_status": execution.status,
+                "request_status": request.status,
             },
         )
 
@@ -110,6 +123,7 @@ async def reject_approval(
     reviewed_by: UUID | None = None,
     reviewer_comment: str | None = None,
 ) -> Approval:
+
     approval = await db.get(
         Approval,
         approval_id,
@@ -118,7 +132,7 @@ async def reject_approval(
     if approval is None:
         raise ValueError("Approval not found.")
 
-    if approval.status != "pending":
+    if approval.status != ApprovalStatus.PENDING.value:
         raise ValueError(
             f"Approval cannot be rejected. "
             f"Current status: {approval.status}"
@@ -132,28 +146,31 @@ async def reject_approval(
     if execution is None:
         raise ValueError("Workflow execution not found.")
 
-    request = await db.get(
-        Request,
-        execution.request_id,
-    )
+    request = None
 
-    approval.status = "rejected"
+    if execution.request_id is not None:
+        request = await db.get(
+            Request,
+            execution.request_id,
+        )
+
+    approval.status = ApprovalStatus.REJECTED.value
     approval.reviewed_by = reviewed_by
     approval.reviewer_comment = reviewer_comment
     approval.reviewed_at = datetime.now(timezone.utc)
 
-    execution.status = "cancelled"
+    execution.status = ExecutionStatus.CANCELLED.value
     execution.current_step = "cancelled"
     execution.completed_at = datetime.now(timezone.utc)
 
     execution.state = {
-        **execution.state,
-        "approval_status": "rejected",
+        **(execution.state or {}),
+        "approval_status": ApprovalStatus.REJECTED.value,
         "reviewer_comment": reviewer_comment,
     }
 
     if request is not None:
-        request.status = "cancelled"
+        request.status = RequestStatus.CANCELLED.value
 
         await create_audit_log(
             db=db,
@@ -164,9 +181,11 @@ async def reject_approval(
             entity_id=str(approval.id),
             action="rejected",
             details={
+                "request_id": str(request.id),
                 "workflow_execution_id": str(execution.id),
                 "reviewer_comment": reviewer_comment,
-                "workflow_status": "cancelled",
+                "workflow_status": execution.status,
+                "request_status": request.status,
             },
         )
 

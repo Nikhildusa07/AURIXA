@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -39,3 +40,5 @@ class RequestResponse(BaseModel):
     confidence_score: float | None
     result: dict | None
     trace_id: str
+    created_at: datetime
+    updated_at: datetime
