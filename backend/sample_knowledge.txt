@@ -1,0 +1,11 @@
+AURIXA Invoice Approval Policy
+
+Invoices with a value greater than 100000 require human approval.
+
+High-value invoices must not be processed automatically without approval.
+
+The approval workflow sends the invoice to a human reviewer.
+
+If the reviewer approves the invoice, the workflow can continue.
+
+If the reviewer rejects the invoice, the workflow is cancelled.

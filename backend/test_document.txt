@@ -1,0 +1,4 @@
+AURIXA is an autonomous enterprise AI platform.
+It processes business requests, retrieves approved knowledge,
+executes authorized workflows, validates results, and records
+important actions for auditability.
