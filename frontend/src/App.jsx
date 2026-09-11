@@ -1,3 +1,5 @@
+// frontend/src/App.jsx
+
 import {
   useCallback,
   useEffect,
@@ -18,13 +20,24 @@ import api, {
 
 import "./App.css";
 
+// ========================================
+// HELPERS
+// ========================================
+
 const normalizeStatus = (status) =>
   String(status || "").toLowerCase().trim();
 
 const getArrayData = (data) => {
   if (Array.isArray(data)) return data;
+
   if (Array.isArray(data?.items)) return data.items;
+
   if (Array.isArray(data?.data)) return data.data;
+
+  if (Array.isArray(data?.records)) return data.records;
+
+  if (Array.isArray(data?.results)) return data.results;
+
   return [];
 };
 
@@ -54,7 +67,11 @@ const getErrorMessage = (
   }
 
   if (typeof detail === "object") {
-    return detail?.msg || detail?.message || fallback;
+    return (
+      detail?.msg ||
+      detail?.message ||
+      fallback
+    );
   }
 
   return String(detail);
@@ -118,7 +135,9 @@ const formatRecommendation = (recommendation) => {
   }
 
   if (typeof recommendation === "object") {
-    const entries = Object.entries(recommendation);
+    const entries = Object.entries(
+      recommendation
+    );
 
     if (!entries.length) {
       return "No AI recommendation available.";
@@ -195,25 +214,27 @@ const sortByLatest = (items = []) =>
     return secondDate - firstDate;
   });
 
+// ========================================
+// APP
+// ========================================
+
 function App() {
   const [token, setToken] = useState(() =>
     localStorage.getItem("access_token")
   );
 
-  const [authMode, setAuthMode] =
-    useState("login");
-
   const [activePage, setActivePage] =
     useState("dashboard");
+
+  const [authMode, setAuthMode] =
+    useState("login");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] =
     useState("");
-
-  const [fullName, setFullName] =
-    useState("");
-
   const [confirmPassword, setConfirmPassword] =
+    useState("");
+  const [fullName, setFullName] =
     useState("");
 
   const [loginError, setLoginError] =
@@ -222,8 +243,10 @@ function App() {
   const [registerMessage, setRegisterMessage] =
     useState("");
 
-  const [registerMessageType, setRegisterMessageType] =
-    useState("");
+  const [
+    registerMessageType,
+    setRegisterMessageType,
+  ] = useState("");
 
   const [loggingIn, setLoggingIn] =
     useState(false);
@@ -244,6 +267,15 @@ function App() {
     useState([]);
 
   const [auditLogs, setAuditLogs] =
+    useState([]);
+
+  const [backgroundJobs, setBackgroundJobs] =
+    useState([]);
+
+  const [analyticsSummary, setAnalyticsSummary] =
+    useState(null);
+
+  const [analyticsRecords, setAnalyticsRecords] =
     useState([]);
 
   const [loading, setLoading] =
@@ -293,6 +325,63 @@ function App() {
     setApprovalActionLoading,
   ] = useState("");
 
+  const [
+    agentLoading,
+    setAgentLoading,
+  ] = useState(false);
+
+  const [
+    agentResult,
+    setAgentResult,
+  ] = useState(null);
+
+  const [
+    agentMessage,
+    setAgentMessage,
+  ] = useState("");
+
+  const [
+    agentForm,
+    setAgentForm,
+  ] = useState({
+    task: "",
+    context: "",
+  });
+
+  const [
+    jobActionLoading,
+    setJobActionLoading,
+  ] = useState("");
+
+  const [
+    jobsMessage,
+    setJobsMessage,
+  ] = useState("");
+
+  const [
+    jobsMessageType,
+    setJobsMessageType,
+  ] = useState("");
+
+  const [
+    showJobModal,
+    setShowJobModal,
+  ] = useState(false);
+
+  const [
+    schedulingJob,
+    setSchedulingJob,
+  ] = useState(false);
+
+  const [
+    jobForm,
+    setJobForm,
+  ] = useState({
+    job_type: "workflow",
+    name: "",
+    payload: "",
+  });
+
   const requestModalTimeoutRef =
     useRef(null);
 
@@ -303,6 +392,10 @@ function App() {
       request_type: "general",
       priority: "medium",
     });
+
+  // ========================================
+  // LOAD PLATFORM DATA
+  // ========================================
 
   const loadDashboard = useCallback(
     async (showLoader = true) => {
@@ -328,10 +421,15 @@ function App() {
             getWorkflowExecutions(),
             getApprovals(),
             getAuditLogs(),
+            api.get("/api/v1/background-jobs/"),
+            api.get("/api/v1/analytics/summary"),
+            api.get("/api/v1/analytics/records"),
           ]);
 
         if (results[0].status === "fulfilled") {
-          setMonitoring(results[0].value || {});
+          setMonitoring(
+            results[0].value || {}
+          );
         }
 
         if (results[1].status === "fulfilled") {
@@ -358,27 +456,47 @@ function App() {
           );
         }
 
+        if (results[5].status === "fulfilled") {
+          setBackgroundJobs(
+            getArrayData(
+              results[5].value?.data ||
+                results[5].value
+            )
+          );
+        }
+
+        if (results[6].status === "fulfilled") {
+          setAnalyticsSummary(
+            results[6].value?.data ||
+              results[6].value ||
+              {}
+          );
+        }
+
+        if (results[7].status === "fulfilled") {
+          setAnalyticsRecords(
+            getArrayData(
+              results[7].value?.data ||
+                results[7].value
+            )
+          );
+        }
+
         const unauthorized = results.some(
           (result) =>
             result.status === "rejected" &&
-            result.reason?.response?.status === 401
+            result.reason?.response?.status ===
+              401
         );
 
         if (unauthorized) {
-          localStorage.removeItem("access_token");
-          setToken(null);
-          return;
-        }
-
-        const failedResults = results.filter(
-          (result) =>
-            result.status === "rejected"
-        );
-
-        if (failedResults.length > 0) {
-          setError(
-            "Some platform data could not be loaded. Please check the backend API."
+          localStorage.removeItem(
+            "access_token"
           );
+
+          setToken(null);
+          setLoading(false);
+          return;
         }
 
         setLastUpdated(new Date());
@@ -396,6 +514,10 @@ function App() {
     []
   );
 
+  // ========================================
+  // INITIAL LOAD
+  // ========================================
+
   useEffect(() => {
     if (token) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -404,6 +526,10 @@ function App() {
       setLoading(false);
     }
   }, [token, loadDashboard]);
+
+  // ========================================
+  // AUTO REFRESH
+  // ========================================
 
   useEffect(() => {
     if (!token || !autoRefresh) {
@@ -431,13 +557,15 @@ function App() {
     };
   }, []);
 
+  // ========================================
+  // AUTH
+  // ========================================
+
   const switchAuthMode = (mode) => {
     setAuthMode(mode);
     setLoginError("");
     setRegisterMessage("");
     setRegisterMessageType("");
-    setPassword("");
-    setConfirmPassword("");
   };
 
   const handleLogin = async (event) => {
@@ -448,19 +576,20 @@ function App() {
       setLoginError("");
 
       const response = await api.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         {
-          email: String(email || "").trim(),
-          password: String(password || ""),
+          email,
+          password,
         }
       );
 
       const accessToken =
-        response?.data?.access_token;
+        response?.data?.access_token ||
+        response?.access_token;
 
       if (!accessToken) {
         throw new Error(
-          "No access token received from server."
+          "Access token was not returned."
         );
       }
 
@@ -475,7 +604,7 @@ function App() {
       setLoginError(
         getErrorMessage(
           err,
-          "Login failed. Check your credentials."
+          "Invalid email or password."
         )
       );
     } finally {
@@ -486,75 +615,46 @@ function App() {
   const handleRegister = async (event) => {
     event.preventDefault();
 
+    if (password !== confirmPassword) {
+      setRegisterMessage(
+        "Passwords do not match."
+      );
+
+      setRegisterMessageType("error");
+      return;
+    }
+
     try {
       setRegistering(true);
       setRegisterMessage("");
-      setRegisterMessageType("");
 
-      const trimmedName = String(
-        fullName || ""
-      ).trim();
-
-      const trimmedEmail = String(
-        email || ""
-      ).trim();
-
-      if (!trimmedName) {
-        throw new Error(
-          "Full name is required."
-        );
-      }
-
-      if (!trimmedEmail) {
-        throw new Error(
-          "Email is required."
-        );
-      }
-
-      if (!password) {
-        throw new Error(
-          "Password is required."
-        );
-      }
-
-      if (password.length < 6) {
-        throw new Error(
-          "Password must be at least 6 characters."
-        );
-      }
-
-      if (password !== confirmPassword) {
-        throw new Error(
-          "Passwords do not match."
-        );
-      }
-
-      await api.post("/auth/register", {
-        full_name: trimmedName,
-        email: trimmedEmail,
-        password,
-      });
+      await api.post(
+        "/api/v1/auth/register",
+        {
+          full_name: fullName,
+          email,
+          password,
+        }
+      );
 
       setRegisterMessage(
-        "Registration successful. You can now sign in."
+        "Account created successfully. Please sign in."
       );
 
       setRegisterMessageType("success");
 
-      setFullName("");
       setPassword("");
       setConfirmPassword("");
+      setFullName("");
 
       setTimeout(() => {
         setAuthMode("login");
-        setRegisterMessage("");
-        setRegisterMessageType("");
       }, 1200);
     } catch (err) {
       setRegisterMessage(
         getErrorMessage(
           err,
-          "Registration failed. Please try again."
+          "Failed to create account."
         )
       );
 
@@ -568,32 +668,37 @@ function App() {
     localStorage.removeItem("access_token");
 
     setToken(null);
-    setMonitoring(null);
     setRequests([]);
     setWorkflows([]);
     setApprovals([]);
     setAuditLogs([]);
-
+    setBackgroundJobs([]);
+    setAnalyticsSummary(null);
+    setAnalyticsRecords([]);
+    setMonitoring(null);
     setActivePage("dashboard");
-    setError("");
-    setLastUpdated(null);
-    setAutoRefresh(false);
-    setDashboardSearch("");
-    setDashboardWorkflowFilter("all");
-    setShowRequestModal(false);
+  };
+
+  // ========================================
+  // REQUESTS
+  // ========================================
+
+  const updateRequestForm = (
+    field,
+    value
+  ) => {
+    setRequestForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
   };
 
   const closeRequestModal = () => {
+    if (creatingRequest) return;
+
     setShowRequestModal(false);
     setRequestMessage("");
     setRequestMessageType("");
-
-    setRequestForm({
-      title: "",
-      description: "",
-      request_type: "general",
-      priority: "medium",
-    });
   };
 
   const handleCreateRequest = async (
@@ -604,31 +709,11 @@ function App() {
     try {
       setCreatingRequest(true);
       setRequestMessage("");
-      setRequestMessageType("");
 
-      const payload = {
-        title: String(
-          requestForm.title || ""
-        ).trim(),
-
-        content: String(
-          requestForm.description || ""
-        ).trim(),
-
-        request_type:
-          requestForm.request_type,
-
-        priority:
-          requestForm.priority,
-      };
-
-      if (!payload.title || !payload.content) {
-        throw new Error(
-          "Title and description are required."
-        );
-      }
-
-      await api.post("/requests", payload);
+      await api.post(
+        "/api/v1/requests",
+        requestForm
+      );
 
       setRequestMessage(
         "Request created successfully."
@@ -636,12 +721,30 @@ function App() {
 
       setRequestMessageType("success");
 
-      await loadDashboard(false);
+      setRequestForm({
+        title: "",
+        description: "",
+        request_type: "general",
+        priority: "medium",
+      });
+
+      const response = await getRequests();
+
+      setRequests(
+        getArrayData(response)
+      );
+
+      if (requestModalTimeoutRef.current) {
+        clearTimeout(
+          requestModalTimeoutRef.current
+        );
+      }
 
       requestModalTimeoutRef.current =
         setTimeout(() => {
-          closeRequestModal();
-        }, 1000);
+          setShowRequestModal(false);
+          setRequestMessage("");
+        }, 1200);
     } catch (err) {
       setRequestMessage(
         getErrorMessage(
@@ -656,48 +759,41 @@ function App() {
     }
   };
 
+  // ========================================
+  // APPROVALS
+  // ========================================
+
   const handleApproval = async (
-    approvalId,
-    action
+    approval,
+    decision
   ) => {
-    const confirmed = window.confirm(
-      action === "approved"
-        ? "Approve this workflow?"
-        : "Reject this workflow?"
-    );
+    const approvalId = approval?.id;
 
-    if (!confirmed) return;
-
-    const comment =
-      window.prompt(
-        action === "approved"
-          ? "Optional approval comment:"
-          : "Optional rejection reason:"
-      ) || "";
+    if (!approvalId) return;
 
     try {
       setApprovalActionLoading(
-        String(approvalId)
+        `${approvalId}-${decision}`
       );
 
-      if (action === "approved") {
-        await approveApproval(
-          approvalId,
-          comment
-        );
+      if (decision === "approved") {
+        await approveApproval(approvalId);
       } else {
-        await rejectApproval(
-          approvalId,
-          comment
-        );
+        await rejectApproval(approvalId);
       }
+
+      const response = await getApprovals();
+
+      setApprovals(
+        getArrayData(response)
+      );
 
       await loadDashboard(false);
     } catch (err) {
-      alert(
+      setError(
         getErrorMessage(
           err,
-          `Failed to ${action} approval.`
+          "Failed to update approval."
         )
       );
     } finally {
@@ -705,87 +801,188 @@ function App() {
     }
   };
 
-  const updateRequestForm = (
+  // ========================================
+  // AGENTS
+  // ========================================
+
+  const handleAgentFormChange = (
     field,
     value
   ) => {
-    setRequestForm((previous) => ({
+    setAgentForm((previous) => ({
       ...previous,
       [field]: value,
     }));
   };
 
-  const completedWorkflows =
-    workflows.filter(
-      (workflow) =>
-        normalizeStatus(
-          workflow?.status
-        ) === "completed"
-    ).length;
+  const handleOrchestrateAgent = async (
+    event
+  ) => {
+    event.preventDefault();
 
-  const failedWorkflows =
-    workflows.filter((workflow) =>
-      [
-        "failed",
-        "error",
-        "cancelled",
-        "canceled",
-      ].includes(
-        normalizeStatus(workflow?.status)
-      )
-    ).length;
+    try {
+      setAgentLoading(true);
+      setAgentMessage("");
+      setAgentResult(null);
 
-  const pendingApprovals =
-    approvals.filter(
-      (approval) =>
-        normalizeStatus(
-          approval?.status
-        ) === "pending"
-    ).length;
+      const response = await api.post(
+        "/api/v1/agents/orchestrate",
+        {
+          task: agentForm.task,
+          context: agentForm.context || undefined,
+        }
+      );
 
-  const pendingRequests =
-    requests.filter(
-      (request) =>
-        normalizeStatus(
-          request?.status
-        ) === "pending"
-    ).length;
+      setAgentResult(
+        response?.data || response
+      );
 
-  const activeWorkflows =
-    workflows.filter((workflow) =>
-      [
-        "running",
-        "processing",
-        "in-progress",
-        "in_progress",
-        "active",
-      ].includes(
-        normalizeStatus(workflow?.status)
-      )
-    ).length;
-
-  const successRate =
-    workflows.length > 0
-      ? Math.round(
-          (completedWorkflows /
-            workflows.length) *
-            100
+      setAgentMessage(
+        "Agent orchestration completed successfully."
+      );
+    } catch (err) {
+      setAgentMessage(
+        getErrorMessage(
+          err,
+          "Agent orchestration failed."
         )
-      : 0;
+      );
+    } finally {
+      setAgentLoading(false);
+    }
+  };
 
-  const systemStatus =
-    monitoring?.status ||
-    monitoring?.system_status ||
-    "Operational";
+  // ========================================
+  // BACKGROUND JOBS
+  // ========================================
 
-  const sortedWorkflows = useMemo(
-    () => sortByLatest(workflows),
-    [workflows]
-  );
+  const loadBackgroundJobs = async () => {
+    try {
+      const response = await api.get(
+        "/api/v1/background-jobs/"
+      );
+
+      setBackgroundJobs(
+        getArrayData(
+          response?.data || response
+        )
+      );
+    } catch (err) {
+      setJobsMessage(
+        getErrorMessage(
+          err,
+          "Failed to load background jobs."
+        )
+      );
+
+      setJobsMessageType("error");
+    }
+  };
+
+  const handleScheduleJob = async (
+    event
+  ) => {
+    event.preventDefault();
+
+    try {
+      setSchedulingJob(true);
+      setJobsMessage("");
+
+      let parsedPayload = {};
+
+      if (jobForm.payload.trim()) {
+        try {
+          parsedPayload = JSON.parse(
+            jobForm.payload
+          );
+        } catch {
+          throw new Error(
+            "Payload must be valid JSON."
+          );
+        }
+      }
+
+      await api.post(
+        "/api/v1/background-jobs/schedule",
+        {
+          job_type: jobForm.job_type,
+          name: jobForm.name,
+          payload: parsedPayload,
+        }
+      );
+
+      setJobsMessage(
+        "Background job scheduled successfully."
+      );
+
+      setJobsMessageType("success");
+
+      setJobForm({
+        job_type: "workflow",
+        name: "",
+        payload: "",
+      });
+
+      setShowJobModal(false);
+
+      await loadBackgroundJobs();
+    } catch (err) {
+      setJobsMessage(
+        getErrorMessage(
+          err,
+          "Failed to schedule background job."
+        )
+      );
+
+      setJobsMessageType("error");
+    } finally {
+      setSchedulingJob(false);
+    }
+  };
+
+  const handleJobAction = async (
+    endpoint,
+    loadingKey
+  ) => {
+    try {
+      setJobActionLoading(loadingKey);
+      setJobsMessage("");
+
+      await api.post(endpoint);
+
+      setJobsMessage(
+        "Background job action completed successfully."
+      );
+
+      setJobsMessageType("success");
+
+      await loadBackgroundJobs();
+    } catch (err) {
+      setJobsMessage(
+        getErrorMessage(
+          err,
+          "Background job action failed."
+        )
+      );
+
+      setJobsMessageType("error");
+    } finally {
+      setJobActionLoading("");
+    }
+  };
+
+  // ========================================
+  // COMPUTED DATA
+  // ========================================
 
   const sortedRequests = useMemo(
     () => sortByLatest(requests),
     [requests]
+  );
+
+  const sortedWorkflows = useMemo(
+    () => sortByLatest(workflows),
+    [workflows]
   );
 
   const sortedAuditLogs = useMemo(
@@ -793,49 +990,138 @@ function App() {
     [auditLogs]
   );
 
-  const filteredDashboardWorkflows =
-    useMemo(() => {
-      const search = dashboardSearch
-        .toLowerCase()
-        .trim();
+  const pendingRequests = useMemo(
+    () =>
+      requests.filter((request) => {
+        const status = normalizeStatus(
+          request?.status
+        );
 
-      return sortedWorkflows.filter(
-        (workflow) => {
-          const status = normalizeStatus(
-            workflow?.status
-          );
+        return (
+          status.includes("pending") ||
+          status.includes("review")
+        );
+      }).length,
+    [requests]
+  );
 
-          const workflowName =
-            getWorkflowName(
-              workflow
-            ).toLowerCase();
+  const pendingApprovals = useMemo(
+    () =>
+      approvals.filter(
+        (approval) =>
+          normalizeStatus(
+            approval?.status
+          ) === "pending"
+      ).length,
+    [approvals]
+  );
 
-          const workflowStep = String(
-            getWorkflowStep(workflow)
+  const activeWorkflows = useMemo(
+    () =>
+      workflows.filter((workflow) => {
+        const status = normalizeStatus(
+          workflow?.status
+        );
+
+        return (
+          status === "running" ||
+          status === "processing" ||
+          status === "active"
+        );
+      }).length,
+    [workflows]
+  );
+
+  const completedWorkflows = useMemo(
+    () =>
+      workflows.filter((workflow) => {
+        const status = normalizeStatus(
+          workflow?.status
+        );
+
+        return (
+          status === "completed" ||
+          status === "success" ||
+          status === "successful"
+        );
+      }).length,
+    [workflows]
+  );
+
+  const failedWorkflows = useMemo(
+    () =>
+      workflows.filter((workflow) =>
+        normalizeStatus(
+          workflow?.status
+        ).includes("fail")
+      ).length,
+    [workflows]
+  );
+
+  const successRate = useMemo(() => {
+    const total =
+      completedWorkflows + failedWorkflows;
+
+    if (!total) return 0;
+
+    return Math.round(
+      (completedWorkflows / total) * 100
+    );
+  }, [
+    completedWorkflows,
+    failedWorkflows,
+  ]);
+
+  const systemStatus = useMemo(() => {
+    const status =
+      monitoring?.status ||
+      monitoring?.system_status ||
+      monitoring?.overall_status;
+
+    if (!status) {
+      return "Operational";
+    }
+
+    return formatText(status);
+  }, [monitoring]);
+
+  const filteredWorkflows = useMemo(() => {
+    const search =
+      dashboardSearch.toLowerCase().trim();
+
+    return sortedWorkflows.filter(
+      (workflow) => {
+        const name =
+          getWorkflowName(
+            workflow
           ).toLowerCase();
 
-          const matchesSearch =
-            !search ||
-            workflowName.includes(search) ||
-            status.includes(search) ||
-            workflowStep.includes(search);
+        const status = normalizeStatus(
+          workflow?.status
+        );
 
-          const matchesFilter =
-            dashboardWorkflowFilter ===
-              "all" ||
-            status === dashboardWorkflowFilter;
+        const matchesSearch =
+          !search ||
+          name.includes(search) ||
+          status.includes(search);
 
-          return (
-            matchesSearch &&
-            matchesFilter
-          );
-        }
-      );
-    }, [
-      sortedWorkflows,
-      dashboardSearch,
-      dashboardWorkflowFilter,
-    ]);
+        const matchesFilter =
+          dashboardWorkflowFilter ===
+            "all" ||
+          status ===
+            dashboardWorkflowFilter;
+
+        return (
+          matchesSearch &&
+          matchesFilter
+        );
+      }
+    );
+  }, [
+    sortedWorkflows,
+    dashboardSearch,
+    dashboardWorkflowFilter,
+  ]);
 
   const recentRequests =
     sortedRequests.slice(0, 5);
@@ -853,6 +1139,10 @@ function App() {
       )
       .slice(0, 5);
 
+  // ========================================
+  // AUTH PAGE
+  // ========================================
+
   if (!token) {
     return (
       <div className="login-page">
@@ -863,39 +1153,9 @@ function App() {
 
           <h1>AURIXA</h1>
 
-          <p className="auth-subtitle">
+          <p className="auth-description">
             Enterprise AI Automation Platform
           </p>
-
-          <div className="auth-tabs">
-            <button
-              type="button"
-              className={
-                authMode === "login"
-                  ? "auth-tab active"
-                  : "auth-tab"
-              }
-              onClick={() =>
-                switchAuthMode("login")
-              }
-            >
-              Sign In
-            </button>
-
-            <button
-              type="button"
-              className={
-                authMode === "register"
-                  ? "auth-tab active"
-                  : "auth-tab"
-              }
-              onClick={() =>
-                switchAuthMode("register")
-              }
-            >
-              Register
-            </button>
-          </div>
 
           {authMode === "login" ? (
             <form onSubmit={handleLogin}>
@@ -903,13 +1163,8 @@ function App() {
                 Welcome back
               </h2>
 
-              <p className="auth-description">
-                Sign in to access your AURIXA
-                workspace.
-              </p>
-
               {loginError && (
-                <div className="error-box">
+                <div className="form-message form-error">
                   {loginError}
                 </div>
               )}
@@ -954,6 +1209,7 @@ function App() {
 
               <p className="auth-switch-text">
                 New to AURIXA?{" "}
+
                 <button
                   type="button"
                   onClick={() =>
@@ -969,11 +1225,6 @@ function App() {
               <h2 className="auth-heading">
                 Create your account
               </h2>
-
-              <p className="auth-description">
-                Register to access the AURIXA
-                Enterprise AI Platform.
-              </p>
 
               {registerMessage && (
                 <div
@@ -1060,6 +1311,7 @@ function App() {
 
               <p className="auth-switch-text">
                 Already have an account?{" "}
+
                 <button
                   type="button"
                   onClick={() =>
@@ -1076,6 +1328,10 @@ function App() {
     );
   }
 
+  // ========================================
+  // MAIN APPLICATION
+  // ========================================
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -1084,6 +1340,7 @@ function App() {
 
           <div>
             <h1>AURIXA</h1>
+
             <span>
               Enterprise AI Platform
             </span>
@@ -1115,6 +1372,22 @@ function App() {
             setActivePage={setActivePage}
           />
 
+          <NavButton
+            icon="✦"
+            label="Agents"
+            page="agents"
+            activePage={activePage}
+            setActivePage={setActivePage}
+          />
+
+          <NavButton
+            icon="◫"
+            label="Background Jobs"
+            page="background-jobs"
+            activePage={activePage}
+            setActivePage={setActivePage}
+          />
+
           <button
             type="button"
             className={`nav-item ${
@@ -1127,6 +1400,7 @@ function App() {
             }
           >
             <span>✓</span>
+
             Approvals
 
             {pendingApprovals > 0 && (
@@ -1135,6 +1409,14 @@ function App() {
               </b>
             )}
           </button>
+
+          <NavButton
+            icon="▤"
+            label="Analytics"
+            page="analytics"
+            activePage={activePage}
+            setActivePage={setActivePage}
+          />
 
           <NavButton
             icon="◷"
@@ -1156,6 +1438,7 @@ function App() {
         <div className="sidebar-footer">
           <div className="system-status">
             <span className="status-dot" />
+
             System Operational
           </div>
         </div>
@@ -1178,8 +1461,18 @@ function App() {
               {activePage === "workflows" &&
                 "Workflow Executions"}
 
+              {activePage === "agents" &&
+                "AI Agent Orchestration"}
+
+              {activePage ===
+                "background-jobs" &&
+                "Background Job Center"}
+
               {activePage === "approvals" &&
                 "Approval Center"}
+
+              {activePage === "analytics" &&
+                "Enterprise Analytics"}
 
               {activePage === "audit" &&
                 "Audit Logs"}
@@ -1188,13 +1481,12 @@ function App() {
                 "System Monitoring"}
             </h2>
 
-            {activePage === "dashboard" &&
-              lastUpdated && (
-                <span className="last-updated">
-                  Last updated:{" "}
-                  {formatDate(lastUpdated)}
-                </span>
-              )}
+            {lastUpdated && (
+              <span className="last-updated">
+                Last updated:{" "}
+                {formatDate(lastUpdated)}
+              </span>
+            )}
           </div>
 
           <div className="topbar-actions">
@@ -1207,6 +1499,19 @@ function App() {
                 }
               >
                 + New Request
+              </button>
+            )}
+
+            {activePage ===
+              "background-jobs" && (
+              <button
+                type="button"
+                className="create-button"
+                onClick={() =>
+                  setShowJobModal(true)
+                }
+              >
+                + Schedule Job
               </button>
             )}
 
@@ -1231,12 +1536,11 @@ function App() {
             <button
               type="button"
               className="refresh-button"
-              onClick={() => loadDashboard()}
-              disabled={loading}
+              onClick={() =>
+                loadDashboard(false)
+              }
             >
-              {loading
-                ? "Loading..."
-                : "↻ Refresh"}
+              ↻ Refresh
             </button>
 
             <button
@@ -1249,27 +1553,20 @@ function App() {
           </div>
         </header>
 
-        {error && (
-          <div className="error-box">
-            <span>{error}</span>
-
-            <button
-              type="button"
-              onClick={() =>
-                loadDashboard()
-              }
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
         {loading ? (
-          <div className="loading">
-            Loading AURIXA...
+          <div className="loading-state">
+            <div className="spinner" />
+
+            Loading AURIXA platform...
           </div>
         ) : (
           <>
+            {error && (
+              <div className="error-banner">
+                {error}
+              </div>
+            )}
+
             {activePage === "dashboard" && (
               <DashboardPage
                 requests={requests}
@@ -1290,7 +1587,7 @@ function App() {
                 successRate={successRate}
                 systemStatus={systemStatus}
                 filteredWorkflows={
-                  filteredDashboardWorkflows
+                  filteredWorkflows
                 }
                 dashboardSearch={
                   dashboardSearch
@@ -1324,37 +1621,52 @@ function App() {
 
             {activePage === "requests" && (
               <RequestsPage
-                sortedRequests={sortedRequests}
-                setShowRequestModal={
-                  setShowRequestModal
-                }
+                requests={sortedRequests}
               />
             )}
 
             {activePage === "workflows" && (
-              <section className="page-content">
-                <div className="page-heading">
-                  <div>
-                    <h3>
-                      Workflow Executions
-                    </h3>
-                    <p>
-                      Monitor all AI workflow
-                      processing
-                    </p>
-                  </div>
+              <WorkflowsPage
+                workflows={sortedWorkflows}
+              />
+            )}
 
-                  <span className="large-count">
-                    {workflows.length}
-                  </span>
-                </div>
+            {activePage === "agents" && (
+              <AgentsPage
+                agentForm={agentForm}
+                handleAgentFormChange={
+                  handleAgentFormChange
+                }
+                handleOrchestrateAgent={
+                  handleOrchestrateAgent
+                }
+                agentLoading={agentLoading}
+                agentResult={agentResult}
+                agentMessage={agentMessage}
+              />
+            )}
 
-                <div className="panel full-panel">
-                  <WorkflowTable
-                    workflows={sortedWorkflows}
-                  />
-                </div>
-              </section>
+            {activePage ===
+              "background-jobs" && (
+              <BackgroundJobsPage
+                backgroundJobs={backgroundJobs}
+                jobActionLoading={
+                  jobActionLoading
+                }
+                jobsMessage={jobsMessage}
+                jobsMessageType={
+                  jobsMessageType
+                }
+                handleJobAction={
+                  handleJobAction
+                }
+                loadBackgroundJobs={
+                  loadBackgroundJobs
+                }
+                setShowJobModal={
+                  setShowJobModal
+                }
+              />
             )}
 
             {activePage === "approvals" && (
@@ -1367,6 +1679,19 @@ function App() {
                   approvalActionLoading
                 }
                 handleApproval={handleApproval}
+              />
+            )}
+
+            {activePage === "analytics" && (
+              <AnalyticsPage
+                analyticsSummary={
+                  analyticsSummary
+                }
+                analyticsRecords={
+                  analyticsRecords
+                }
+                requests={requests}
+                workflows={workflows}
               />
             )}
 
@@ -1383,6 +1708,9 @@ function App() {
                 monitoring={monitoring}
                 systemStatus={systemStatus}
                 requests={requests}
+                workflows={workflows}
+                approvals={approvals}
+                auditLogs={auditLogs}
                 activeWorkflows={
                   activeWorkflows
                 }
@@ -1392,7 +1720,6 @@ function App() {
                 completedWorkflows={
                   completedWorkflows
                 }
-                auditLogs={auditLogs}
               />
             )}
           </>
@@ -1420,9 +1747,27 @@ function App() {
           }
         />
       )}
+
+      {showJobModal && (
+        <JobModal
+          jobForm={jobForm}
+          setJobForm={setJobForm}
+          handleScheduleJob={
+            handleScheduleJob
+          }
+          schedulingJob={schedulingJob}
+          closeJobModal={() =>
+            setShowJobModal(false)
+          }
+        />
+      )}
     </div>
   );
 }
+
+// ========================================
+// NAV BUTTON
+// ========================================
 
 function NavButton({
   icon,
@@ -1440,10 +1785,15 @@ function NavButton({
       onClick={() => setActivePage(page)}
     >
       <span>{icon}</span>
+
       {label}
     </button>
   );
 }
+
+// ========================================
+// DASHBOARD
+// ========================================
 
 function DashboardPage({
   requests,
@@ -1473,6 +1823,7 @@ function DashboardPage({
       <div className="section-title">
         <div>
           <h3>Platform Overview</h3>
+
           <p>
             Real-time enterprise automation
             insights and operational status
@@ -1484,6 +1835,7 @@ function DashboardPage({
 
           <div>
             <small>Platform Status</small>
+
             <strong>{systemStatus}</strong>
           </div>
         </div>
@@ -1532,25 +1884,27 @@ function DashboardPage({
       </div>
 
       <div className="dashboard-grid">
-        <div className="panel dashboard-performance-panel">
+        <div className="dashboard-performance-panel">
           <div className="panel-header">
             <div>
               <h3>
                 Automation Performance
               </h3>
+
               <p>
                 Workflow execution health
               </p>
             </div>
 
-            <span className="panel-count">
+            <span className="performance-badge">
               {successRate}%
             </span>
           </div>
 
           <div className="performance-grid">
-            <div className="performance-item">
+            <div className="performance-item main-performance">
               <span>Success Rate</span>
+
               <strong>{successRate}%</strong>
 
               <div className="progress-track">
@@ -1565,6 +1919,7 @@ function DashboardPage({
 
             <div className="performance-item">
               <span>Completed</span>
+
               <strong>
                 {completedWorkflows}
               </strong>
@@ -1572,20 +1927,19 @@ function DashboardPage({
 
             <div className="performance-item">
               <span>Failed</span>
-              <strong>{failedWorkflows}</strong>
-            </div>
 
-            <div className="performance-item">
-              <span>Running</span>
-              <strong>{activeWorkflows}</strong>
+              <strong>
+                {failedWorkflows}
+              </strong>
             </div>
           </div>
         </div>
 
-        <div className="panel quick-actions-panel">
+        <div className="quick-actions-panel">
           <div className="panel-header">
             <div>
               <h3>Quick Actions</h3>
+
               <p>
                 Manage the platform faster
               </p>
@@ -1593,355 +1947,286 @@ function DashboardPage({
           </div>
 
           <div className="quick-actions">
-            <QuickAction
-              icon="＋"
-              title="New Request"
-              description="Create automation"
-              onClick={() => {
-                setActivePage("requests");
-                setShowRequestModal(true);
-              }}
-            />
-
-            <QuickAction
-              icon="✓"
-              title="Review Approvals"
-              description={`${pendingApprovals} pending`}
+            <button
+              type="button"
               onClick={() =>
-                setActivePage("approvals")
+                setShowRequestModal(true)
               }
-            />
+            >
+              <span>+</span>
 
-            <QuickAction
-              icon="⚙"
-              title="View Workflows"
-              description="Monitor executions"
-              onClick={() =>
-                setActivePage("workflows")
-              }
-            />
+              <div>
+                <strong>New Request</strong>
 
-            <QuickAction
-              icon="◉"
-              title="System Health"
-              description="Check monitoring"
-              onClick={() =>
-                setActivePage("monitoring")
-              }
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="panel full-panel">
-        <div className="panel-header">
-          <div>
-            <h3>
-              Recent Workflow Activity
-            </h3>
-            <p>
-              Search and monitor the latest
-              automation executions
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="view-all-button"
-            onClick={() =>
-              setActivePage("workflows")
-            }
-          >
-            View All
-          </button>
-        </div>
-
-        <div className="dashboard-controls">
-          <input
-            type="text"
-            placeholder="Search workflows..."
-            value={dashboardSearch}
-            onChange={(event) =>
-              setDashboardSearch(
-                event.target.value
-              )
-            }
-          />
-
-          <select
-            value={dashboardWorkflowFilter}
-            onChange={(event) =>
-              setDashboardWorkflowFilter(
-                event.target.value
-              )
-            }
-          >
-            <option value="all">
-              All Status
-            </option>
-            <option value="running">
-              Running
-            </option>
-            <option value="processing">
-              Processing
-            </option>
-            <option value="completed">
-              Completed
-            </option>
-            <option value="failed">
-              Failed
-            </option>
-            <option value="cancelled">
-              Cancelled
-            </option>
-          </select>
-        </div>
-
-        <WorkflowTable
-          workflows={
-            filteredWorkflows.slice(0, 6)
-          }
-        />
-      </div>
-
-      <div className="dashboard-grid">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h3>Pending Approvals</h3>
-              <p>
-                Human decisions required
-              </p>
-            </div>
+                <small>
+                  Create automation
+                </small>
+              </div>
+            </button>
 
             <button
               type="button"
-              className="panel-count panel-count-button"
               onClick={() =>
                 setActivePage("approvals")
               }
             >
-              {pendingApprovals}
+              <span>✓</span>
+
+              <div>
+                <strong>
+                  Review Approvals
+                </strong>
+
+                <small>
+                  {pendingApprovals} pending
+                </small>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setActivePage("workflows")
+              }
+            >
+              <span>⚙</span>
+
+              <div>
+                <strong>
+                  View Workflows
+                </strong>
+
+                <small>
+                  Monitor executions
+                </small>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setActivePage("monitoring")
+              }
+            >
+              <span>◉</span>
+
+              <div>
+                <strong>System Health</strong>
+
+                <small>
+                  Check monitoring
+                </small>
+              </div>
             </button>
           </div>
+        </div>
+      </div>
 
-          <div className="mini-list">
-            {dashboardPendingApprovals.map(
-              (approval, index) => {
-                const isLoading =
-                  approvalActionLoading ===
-                  String(approval?.id);
+      <div className="dashboard-two-column">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>
+                Workflow Executions
+              </h3>
 
-                return (
-                  <div
-                    className="dashboard-approval-item"
+              <p>
+                Recent automation activity
+              </p>
+            </div>
+          </div>
+
+          <div className="dashboard-controls">
+            <input
+              type="text"
+              placeholder="Search workflows..."
+              value={dashboardSearch}
+              onChange={(event) =>
+                setDashboardSearch(
+                  event.target.value
+                )
+              }
+            />
+
+            <select
+              value={
+                dashboardWorkflowFilter
+              }
+              onChange={(event) =>
+                setDashboardWorkflowFilter(
+                  event.target.value
+                )
+              }
+            >
+              <option value="all">
+                All Statuses
+              </option>
+
+              <option value="running">
+                Running
+              </option>
+
+              <option value="completed">
+                Completed
+              </option>
+
+              <option value="failed">
+                Failed
+              </option>
+            </select>
+          </div>
+
+          <WorkflowTable
+            workflows={filteredWorkflows.slice(
+              0,
+              6
+            )}
+          />
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>
+                Pending Approvals
+              </h3>
+
+              <p>
+                Human review queue
+              </p>
+            </div>
+          </div>
+
+          {dashboardPendingApprovals.length ===
+          0 ? (
+            <div className="empty-state">
+              No pending approvals.
+            </div>
+          ) : (
+            <div className="compact-list">
+              {dashboardPendingApprovals.map(
+                (approval, index) => (
+                  <ApprovalCard
                     key={
                       approval?.id || index
                     }
-                  >
-                    <div className="mini-item">
-                      <div>
-                        <strong>
-                          {approval.reason ||
-                            "Workflow requires review"}
-                        </strong>
-
-                        <span>
-                          {formatRecommendation(
-                            approval.recommendation
-                          )}
-                        </span>
-                      </div>
-
-                      <StatusBadge
-                        status={
-                          approval.status
-                        }
-                      />
-                    </div>
-
-                    <div className="dashboard-approval-actions">
-                      <button
-                        type="button"
-                        className="small-reject-button"
-                        disabled={isLoading}
-                        onClick={() =>
-                          handleApproval(
-                            approval.id,
-                            "rejected"
-                          )
-                        }
-                      >
-                        Reject
-                      </button>
-
-                      <button
-                        type="button"
-                        className="small-approve-button"
-                        disabled={isLoading}
-                        onClick={() =>
-                          handleApproval(
-                            approval.id,
-                            "approved"
-                          )
-                        }
-                      >
-                        {isLoading
-                          ? "Processing..."
-                          : "Approve"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-            )}
-
-            {pendingApprovals === 0 && (
-              <div className="empty-state">
-                No pending approvals.
-              </div>
-            )}
-          </div>
+                    approval={approval}
+                    approvalActionLoading={
+                      approvalActionLoading
+                    }
+                    handleApproval={
+                      handleApproval
+                    }
+                    compact
+                  />
+                )
+              )}
+            </div>
+          )}
         </div>
+      </div>
 
+      <div className="dashboard-two-column">
         <div className="panel">
           <div className="panel-header">
             <div>
               <h3>Recent Requests</h3>
+
               <p>
                 Latest enterprise requests
               </p>
             </div>
-
-            <button
-              type="button"
-              className="view-all-button"
-              onClick={() =>
-                setActivePage("requests")
-              }
-            >
-              View All
-            </button>
           </div>
 
-          <div className="mini-list">
-            {recentRequests.map(
-              (request, index) => (
-                <button
-                  type="button"
-                  className="mini-item mini-item-button"
-                  key={
-                    request?.id ||
-                    request?.request_id ||
-                    index
-                  }
-                  onClick={() =>
-                    setActivePage("requests")
-                  }
-                >
-                  <div>
-                    <strong>
-                      {request?.title ||
-                        "Untitled Request"}
-                    </strong>
+          {recentRequests.length === 0 ? (
+            <div className="empty-state">
+              No requests found.
+            </div>
+          ) : (
+            <div className="activity-list">
+              {recentRequests.map(
+                (request, index) => (
+                  <div
+                    className="activity-item"
+                    key={
+                      request?.id || index
+                    }
+                  >
+                    <div>
+                      <strong>
+                        {formatText(
+                          request?.title ||
+                            request?.name
+                        )}
+                      </strong>
 
-                    <span>
-                      {formatText(
-                        request?.request_type,
-                        "General"
-                      )}{" "}
-                      •{" "}
-                      {formatText(
-                        request?.priority,
-                        "Medium"
-                      )}
-                    </span>
+                      <small>
+                        {formatDate(
+                          request?.created_at
+                        )}
+                      </small>
+                    </div>
+
+                    <StatusBadge
+                      status={request?.status}
+                    />
                   </div>
-
-                  <StatusBadge
-                    status={request?.status}
-                  />
-                </button>
-              )
-            )}
-
-            {recentRequests.length === 0 && (
-              <div className="empty-state">
-                No requests found.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="panel full-panel">
-        <div className="panel-header">
-          <div>
-            <h3>Live Activity Feed</h3>
-            <p>
-              Latest traceable platform events
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="view-all-button"
-            onClick={() =>
-              setActivePage("audit")
-            }
-          >
-            Audit Logs
-          </button>
+                )
+              )}
+            </div>
+          )}
         </div>
 
-        {recentAuditActivity.length === 0 ? (
-          <div className="empty-state">
-            No recent activity found.
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Audit Activity</h3>
+
+              <p>
+                Latest platform events
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="activity-feed">
-            {recentAuditActivity.map(
-              (log, index) => (
-                <div
-                  className="activity-item"
-                  key={log?.id || index}
-                >
-                  <div className="activity-icon">
-                    ◷
-                  </div>
 
-                  <div className="activity-content">
-                    <strong>
-                      {formatText(
-                        log?.action,
-                        "Platform activity"
+          {recentAuditActivity.length ===
+          0 ? (
+            <div className="empty-state">
+              No audit activity found.
+            </div>
+          ) : (
+            <div className="activity-list">
+              {recentAuditActivity.map(
+                (log, index) => (
+                  <div
+                    className="activity-item"
+                    key={log?.id || index}
+                  >
+                    <div>
+                      <strong>
+                        {formatText(
+                          log?.action
+                        )}
+                      </strong>
+
+                      <small>
+                        {formatText(
+                          log?.entity_type
+                        )}
+                      </small>
+                    </div>
+
+                    <small>
+                      {formatDate(
+                        log?.created_at ||
+                          log?.updated_at
                       )}
-                    </strong>
-
-                    <span>
-                      {formatText(
-                        log?.event_type,
-                        "System Event"
-                      )}{" "}
-                      •{" "}
-                      {formatText(
-                        log?.entity_type,
-                        "Platform"
-                      )}
-                    </span>
+                    </small>
                   </div>
-
-                  <time>
-                    {formatDate(
-                      log?.created_at ||
-                        log?.updated_at
-                    )}
-                  </time>
-                </div>
-              )
-            )}
-          </div>
-        )}
+                )
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -1957,98 +2242,113 @@ function DashboardStat({
   return (
     <button
       type="button"
-      className="stat-card stat-card-button"
+      className="stat-card"
       onClick={onClick}
     >
-      <div className="stat-icon">{icon}</div>
+      <div className="stat-icon">
+        {icon}
+      </div>
 
       <div>
-        <p>{title}</p>
-        <h3>{value}</h3>
-        <span>{subtitle}</span>
+        <span>{title}</span>
+
+        <strong>{value}</strong>
+
+        <small>{subtitle}</small>
       </div>
     </button>
   );
 }
 
-function QuickAction({
-  icon,
-  title,
-  description,
-  onClick,
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-    >
-      <span>{icon}</span>
+// ========================================
+// REQUESTS
+// ========================================
 
-      <div>
-        <strong>{title}</strong>
-        <small>{description}</small>
-      </div>
-    </button>
-  );
-}
-
-function RequestsPage({
-  sortedRequests,
-  setShowRequestModal,
-}) {
+function RequestsPage({ requests }) {
   return (
     <section className="page-content">
       <div className="page-heading">
         <div>
           <h3>Enterprise Requests</h3>
+
           <p>
-            Create and manage automation
-            requests
+            AI-powered automation requests
           </p>
         </div>
 
-        <button
-          type="button"
-          className="create-button"
-          onClick={() =>
-            setShowRequestModal(true)
-          }
-        >
-          + Create Request
-        </button>
+        <span className="large-count">
+          {requests.length}
+        </span>
       </div>
 
-      {sortedRequests.length === 0 ? (
+      {requests.length === 0 ? (
         <div className="empty-page">
-          <h3>No Requests Yet</h3>
-          <p>
-            Create your first enterprise
-            automation request.
-          </p>
+          <h3>No Requests Found</h3>
 
-          <button
-            type="button"
-            className="create-button"
-            onClick={() =>
-              setShowRequestModal(true)
-            }
-          >
-            + Create Request
-          </button>
+          <p>
+            Create a new enterprise request to
+            start automation.
+          </p>
         </div>
       ) : (
         <div className="requests-grid">
-          {sortedRequests.map(
+          {requests.map(
             (request, index) => (
-              <RequestCard
-                key={
-                  request?.id ||
-                  request?.request_id ||
-                  index
-                }
-                request={request}
-                index={index}
-              />
+              <div
+                className="request-card"
+                key={request?.id || index}
+              >
+                <div className="card-top">
+                  <div>
+                    <h3>
+                      {formatText(
+                        request?.title ||
+                          request?.name
+                      )}
+                    </h3>
+
+                    <p>
+                      {formatText(
+                        request?.description
+                      )}
+                    </p>
+                  </div>
+
+                  <StatusBadge
+                    status={request?.status}
+                  />
+                </div>
+
+                <div className="card-meta">
+                  <span>
+                    Type:{" "}
+                    {formatText(
+                      request?.request_type
+                    )}
+                  </span>
+
+                  <span>
+                    Priority:{" "}
+                    {formatText(
+                      request?.priority
+                    )}
+                  </span>
+                </div>
+
+                <div className="recommendation-box">
+                  {formatRecommendation(
+                    request?.recommendation ||
+                      request?.ai_result
+                  )}
+                </div>
+
+                <small className="card-date">
+                  {formatDate(
+                    request?.created_at ||
+                      request?.updated_at
+                  )}
+                </small>
+              </div>
             )
           )}
         </div>
@@ -2057,67 +2357,464 @@ function RequestsPage({
   );
 }
 
-function RequestCard({ request, index }) {
+// ========================================
+// WORKFLOWS
+// ========================================
+
+function WorkflowsPage({ workflows }) {
   return (
-    <div className="request-card">
-      <div className="request-card-top">
-        <div className="request-number">
-          REQUEST{" "}
-          {String(index + 1).padStart(
-            2,
-            "0"
-          )}
-        </div>
-
-        <StatusBadge
-          status={request?.status}
-        />
-      </div>
-
-      <h3>
-        {request?.title ||
-          "Untitled Request"}
-      </h3>
-
-      <p className="request-description">
-        {request?.content ||
-          request?.description ||
-          "No description available."}
-      </p>
-
-      <div className="request-meta">
+    <section className="page-content">
+      <div className="page-heading">
         <div>
-          <span>Type</span>
-          <strong>
-            {formatText(
-              request?.request_type,
-              "General"
-            )}
-          </strong>
+          <h3>Workflow Executions</h3>
+
+          <p>
+            Monitor enterprise workflow execution
+          </p>
         </div>
 
-        <div>
-          <span>Priority</span>
-          <strong className="priority-text">
-            {formatText(
-              request?.priority,
-              "Medium"
-            )}
-          </strong>
-        </div>
-      </div>
-
-      <div className="request-footer">
-        <span>
-          Created:{" "}
-          {formatDate(
-            request?.created_at
-          )}
+        <span className="large-count">
+          {workflows.length}
         </span>
       </div>
+
+      <div className="panel full-panel">
+        <WorkflowTable workflows={workflows} />
+      </div>
+    </section>
+  );
+}
+
+function WorkflowTable({ workflows }) {
+  if (!workflows.length) {
+    return (
+      <div className="empty-state">
+        No workflow executions found.
+      </div>
+    );
+  }
+
+  return (
+    <div className="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Workflow</th>
+
+            <th>Status</th>
+
+            <th>Current Step</th>
+
+            <th>Updated</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {workflows.map(
+            (workflow, index) => (
+              <tr
+                key={
+                  workflow?.id ||
+                  workflow?.execution_id ||
+                  index
+                }
+              >
+                <td>
+                  {getWorkflowName(
+                    workflow
+                  )}
+                </td>
+
+                <td>
+                  <StatusBadge
+                    status={workflow?.status}
+                  />
+                </td>
+
+                <td>
+                  {getWorkflowStep(
+                    workflow
+                  )}
+                </td>
+
+                <td>
+                  {formatDate(
+                    getWorkflowDate(
+                      workflow
+                    )
+                  )}
+                </td>
+              </tr>
+            )
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
+
+// ========================================
+// AGENTS
+// ========================================
+
+function AgentsPage({
+  agentForm,
+  handleAgentFormChange,
+  handleOrchestrateAgent,
+  agentLoading,
+  agentResult,
+  agentMessage,
+}) {
+  return (
+    <section className="page-content">
+      <div className="page-heading">
+        <div>
+          <h3>AI Agent Orchestration</h3>
+
+          <p>
+            Execute enterprise tasks through the
+            AURIXA agent orchestration system
+          </p>
+        </div>
+
+        <span className="api-route-badge">
+          POST /agents/orchestrate
+        </span>
+      </div>
+
+      <div className="agents-layout">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Orchestrate Agent</h3>
+
+              <p>
+                Submit a task for AI execution
+              </p>
+            </div>
+          </div>
+
+          <form
+            className="agent-form"
+            onSubmit={
+              handleOrchestrateAgent
+            }
+          >
+            <div className="form-group">
+              <label>Task</label>
+
+              <textarea
+                placeholder="Describe the task you want AURIXA agents to execute..."
+                value={agentForm.task}
+                onChange={(event) =>
+                  handleAgentFormChange(
+                    "task",
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>
+                Additional Context
+              </label>
+
+              <textarea
+                placeholder="Optional context, business requirements, or additional instructions..."
+                value={agentForm.context}
+                onChange={(event) =>
+                  handleAgentFormChange(
+                    "context",
+                    event.target.value
+                  )
+                }
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={agentLoading}
+            >
+              {agentLoading
+                ? "Orchestrating..."
+                : "Run Agent Orchestration"}
+            </button>
+          </form>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Agent Result</h3>
+
+              <p>
+                Orchestration response
+              </p>
+            </div>
+          </div>
+
+          {agentMessage && (
+            <div className="form-message form-success">
+              {agentMessage}
+            </div>
+          )}
+
+          {!agentResult ? (
+            <div className="empty-state">
+              Submit an agent task to view the
+              orchestration result.
+            </div>
+          ) : (
+            <div className="agent-result">
+              <pre>
+                {JSON.stringify(
+                  agentResult,
+                  null,
+                  2
+                )}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ========================================
+// BACKGROUND JOBS
+// ========================================
+
+function BackgroundJobsPage({
+  backgroundJobs,
+  jobActionLoading,
+  jobsMessage,
+  jobsMessageType,
+  handleJobAction,
+  loadBackgroundJobs,
+  setShowJobModal,
+}) {
+  return (
+    <section className="page-content">
+      <div className="page-heading">
+        <div>
+          <h3>Background Job Center</h3>
+
+          <p>
+            Schedule, execute, pause and manage
+            enterprise background jobs
+          </p>
+        </div>
+
+        <span className="large-count">
+          {backgroundJobs.length}
+        </span>
+      </div>
+
+      {jobsMessage && (
+        <div
+          className={
+            jobsMessageType === "error"
+              ? "form-message form-error"
+              : "form-message form-success"
+          }
+        >
+          {jobsMessage}
+        </div>
+      )}
+
+      <div className="jobs-toolbar">
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() =>
+            setShowJobModal(true)
+          }
+        >
+          + Schedule Background Job
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={
+            jobActionLoading === "run-next"
+          }
+          onClick={() =>
+            handleJobAction(
+              "/api/v1/background-jobs/run-next",
+              "run-next"
+            )
+          }
+        >
+          {jobActionLoading === "run-next"
+            ? "Running..."
+            : "Run Next"}
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={
+            jobActionLoading === "pause"
+          }
+          onClick={() =>
+            handleJobAction(
+              "/api/v1/background-jobs/pause",
+              "pause"
+            )
+          }
+        >
+          Pause Jobs
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={
+            jobActionLoading === "resume"
+          }
+          onClick={() =>
+            handleJobAction(
+              "/api/v1/background-jobs/resume",
+              "resume"
+            )
+          }
+        >
+          Resume Jobs
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={loadBackgroundJobs}
+        >
+          ↻ Refresh
+        </button>
+      </div>
+
+      <div className="panel full-panel">
+        {backgroundJobs.length === 0 ? (
+          <div className="empty-state">
+            No background jobs found.
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Job</th>
+
+                  <th>Type</th>
+
+                  <th>Status</th>
+
+                  <th>Created</th>
+
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {backgroundJobs.map(
+                  (job, index) => {
+                    const jobId =
+                      job?.id ||
+                      job?.job_id;
+
+                    return (
+                      <tr
+                        key={
+                          jobId || index
+                        }
+                      >
+                        <td>
+                          {formatText(
+                            job?.name ||
+                              job?.job_name
+                          )}
+                        </td>
+
+                        <td>
+                          {formatText(
+                            job?.job_type ||
+                              job?.type
+                          )}
+                        </td>
+
+                        <td>
+                          <StatusBadge
+                            status={
+                              job?.status
+                            }
+                          />
+                        </td>
+
+                        <td>
+                          {formatDate(
+                            job?.created_at ||
+                              job?.scheduled_at
+                          )}
+                        </td>
+
+                        <td>
+                          <div className="table-actions">
+                            {jobId && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={
+                                    jobActionLoading ===
+                                    `retry-${jobId}`
+                                  }
+                                  onClick={() =>
+                                    handleJobAction(
+                                      `/api/v1/background-jobs/${jobId}/retry`,
+                                      `retry-${jobId}`
+                                    )
+                                  }
+                                >
+                                  Retry
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={
+                                    jobActionLoading ===
+                                    `complete-${jobId}`
+                                  }
+                                  onClick={() =>
+                                    handleJobAction(
+                                      `/api/v1/background-jobs/${jobId}/complete`,
+                                      `complete-${jobId}`
+                                    )
+                                  }
+                                >
+                                  Complete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ========================================
+// APPROVALS
+// ========================================
 
 function ApprovalsPage({
   approvals,
@@ -2129,9 +2826,8 @@ function ApprovalsPage({
     <section className="page-content">
       <div className="page-heading">
         <div>
-          <h3>
-            Human Approval Center
-          </h3>
+          <h3>Approval Center</h3>
+
           <p>
             Review AI decisions and approve or
             reject workflow execution
@@ -2146,6 +2842,7 @@ function ApprovalsPage({
       {approvals.length === 0 ? (
         <div className="empty-page">
           <h3>No Approvals Found</h3>
+
           <p>
             Workflows requiring human decisions
             will appear here.
@@ -2156,7 +2853,9 @@ function ApprovalsPage({
           {approvals.map(
             (approval, index) => (
               <ApprovalCard
-                key={approval?.id || index}
+                key={
+                  approval?.id || index
+                }
                 approval={approval}
                 approvalActionLoading={
                   approvalActionLoading
@@ -2177,25 +2876,41 @@ function ApprovalCard({
   approval,
   approvalActionLoading,
   handleApproval,
+  compact = false,
 }) {
-  const isPending =
-    normalizeStatus(
-      approval?.status
-    ) === "pending";
+  const approvalId = approval?.id;
 
-  const isLoading =
+  const approving =
     approvalActionLoading ===
-    String(approval?.id);
+    `${approvalId}-approved`;
+
+  const rejecting =
+    approvalActionLoading ===
+    `${approvalId}-rejected`;
 
   return (
-    <div className="approval-card">
-      <div className="approval-card-header">
+    <div
+      className={`approval-card ${
+        compact ? "compact" : ""
+      }`}
+    >
+      <div className="card-top">
         <div>
-          <span className="approval-label">
-            HUMAN REVIEW
-          </span>
+          <h3>
+            {formatText(
+              approval?.title ||
+                approval?.request_title ||
+                approval?.workflow_name,
+              "Approval Request"
+            )}
+          </h3>
 
-          <h3>Workflow Approval</h3>
+          <p>
+            {formatText(
+              approval?.description ||
+                approval?.reason
+            )}
+          </p>
         </div>
 
         <StatusBadge
@@ -2203,107 +2918,257 @@ function ApprovalCard({
         />
       </div>
 
-      <div className="approval-section">
+      <div className="card-meta">
         <span>
-          Why approval is required
-        </span>
-
-        <p>
-          {approval?.reason ||
-            "This AI workflow requires human review before continuing."}
-        </p>
-      </div>
-
-      <div className="approval-section">
-        <span>AI Recommendation</span>
-
-        <p className="recommendation-text">
-          {formatRecommendation(
-            approval?.recommendation
+          {formatDate(
+            approval?.created_at
           )}
-        </p>
+        </span>
       </div>
 
-      <div className="approval-section approval-workflow-id">
-        <span>Workflow Execution</span>
-
-        <p>
-          {approval?.workflow_execution_id ||
-            "-"}
-        </p>
-      </div>
-
-      {approval?.reviewer_comment && (
-        <div className="approval-section">
-          <span>Reviewer Comment</span>
-          <p>
-            {approval.reviewer_comment}
-          </p>
-        </div>
-      )}
-
-      {isPending ? (
+      {normalizeStatus(
+        approval?.status
+      ) === "pending" && (
         <div className="approval-actions">
           <button
             type="button"
-            className="reject-button"
-            disabled={isLoading}
-            onClick={() =>
-              handleApproval(
-                approval.id,
-                "rejected"
-              )
-            }
-          >
-            {isLoading
-              ? "Processing..."
-              : "Reject"}
-          </button>
-
-          <button
-            type="button"
             className="approve-button"
-            disabled={isLoading}
+            disabled={approving || rejecting}
             onClick={() =>
               handleApproval(
-                approval.id,
+                approval,
                 "approved"
               )
             }
           >
-            {isLoading
-              ? "Processing..."
+            {approving
+              ? "Approving..."
               : "Approve"}
           </button>
-        </div>
-      ) : (
-        <div className="approval-decision">
-          <strong>
-            Decision completed
-          </strong>
 
-          {approval?.reviewed_at && (
-            <span>
-              {formatDate(
-                approval.reviewed_at
-              )}
-            </span>
-          )}
+          <button
+            type="button"
+            className="reject-button"
+            disabled={approving || rejecting}
+            onClick={() =>
+              handleApproval(
+                approval,
+                "rejected"
+              )
+            }
+          >
+            {rejecting
+              ? "Rejecting..."
+              : "Reject"}
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-function AuditPage({ sortedAuditLogs }) {
+// ========================================
+// ANALYTICS
+// ========================================
+
+function AnalyticsPage({
+  analyticsSummary,
+  analyticsRecords,
+  requests,
+  workflows,
+}) {
+  const summary =
+    analyticsSummary || {};
+
+  const totalExecutions =
+    summary?.total_executions ||
+    summary?.executions ||
+    workflows.length;
+
+  const totalRequests =
+    summary?.total_requests ||
+    requests.length;
+
+  const successful =
+    summary?.successful_executions ||
+    summary?.completed ||
+    0;
+
+  const failed =
+    summary?.failed_executions ||
+    summary?.failed ||
+    0;
+
+  return (
+    <section className="page-content">
+      <div className="page-heading">
+        <div>
+          <h3>Enterprise Analytics</h3>
+
+          <p>
+            Operational performance and execution
+            intelligence
+          </p>
+        </div>
+
+        <span className="api-route-badge">
+          GET /analytics/summary
+        </span>
+      </div>
+
+      <div className="stats-grid analytics-stats">
+        <DashboardStat
+          icon="▤"
+          title="Total Requests"
+          value={totalRequests}
+          subtitle="Platform requests"
+        />
+
+        <DashboardStat
+          icon="⚙"
+          title="Executions"
+          value={totalExecutions}
+          subtitle="Workflow activity"
+        />
+
+        <DashboardStat
+          icon="✓"
+          title="Successful"
+          value={successful}
+          subtitle="Completed successfully"
+        />
+
+        <DashboardStat
+          icon="!"
+          title="Failed"
+          value={failed}
+          subtitle="Requires attention"
+        />
+      </div>
+
+      <div className="analytics-grid">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Analytics Summary</h3>
+
+              <p>
+                Current aggregated platform metrics
+              </p>
+            </div>
+          </div>
+
+          <div className="analytics-summary-list">
+            {Object.keys(summary).length ===
+            0 ? (
+              <div className="empty-state">
+                No analytics summary available.
+              </div>
+            ) : (
+              Object.entries(summary).map(
+                ([key, value]) => (
+                  <div
+                    className="analytics-row"
+                    key={key}
+                  >
+                    <span>
+                      {key
+                        .replaceAll("_", " ")
+                        .replace(
+                          /\b\w/g,
+                          (char) =>
+                            char.toUpperCase()
+                        )}
+                    </span>
+
+                    <strong>
+                      {typeof value ===
+                      "object"
+                        ? JSON.stringify(value)
+                        : String(value)}
+                    </strong>
+                  </div>
+                )
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h3>Execution Insights</h3>
+
+              <p>
+                Latest analytics records
+              </p>
+            </div>
+          </div>
+
+          {analyticsRecords.length === 0 ? (
+            <div className="empty-state">
+              No analytics records available.
+            </div>
+          ) : (
+            <div className="analytics-records">
+              {analyticsRecords
+                .slice(0, 10)
+                .map((record, index) => (
+                  <div
+                    className="analytics-record"
+                    key={
+                      record?.id || index
+                    }
+                  >
+                    <div>
+                      <strong>
+                        {formatText(
+                          record?.workflow_name ||
+                            record?.name ||
+                            record?.execution_id,
+                          "Execution Record"
+                        )}
+                      </strong>
+
+                      <small>
+                        {formatDate(
+                          record?.created_at ||
+                            record?.timestamp
+                        )}
+                      </small>
+                    </div>
+
+                    <StatusBadge
+                      status={
+                        record?.status ||
+                        record?.result
+                      }
+                    />
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ========================================
+// AUDIT
+// ========================================
+
+function AuditPage({
+  sortedAuditLogs,
+}) {
   return (
     <section className="page-content">
       <div className="page-heading">
         <div>
           <h3>Live Audit Activity</h3>
+
           <p>
-            Complete traceable enterprise
-            activity
+            Complete traceable enterprise activity
           </p>
         </div>
       </div>
@@ -2319,8 +3184,11 @@ function AuditPage({ sortedAuditLogs }) {
               <thead>
                 <tr>
                   <th>Action</th>
+
                   <th>Event Type</th>
+
                   <th>Entity</th>
+
                   <th>Time</th>
                 </tr>
               </thead>
@@ -2332,7 +3200,9 @@ function AuditPage({ sortedAuditLogs }) {
                       key={log?.id || index}
                     >
                       <td>
-                        {formatText(log?.action)}
+                        {formatText(
+                          log?.action
+                        )}
                       </td>
 
                       <td>
@@ -2365,233 +3235,211 @@ function AuditPage({ sortedAuditLogs }) {
   );
 }
 
+// ========================================
+// MONITORING
+// ========================================
+
 function MonitoringPage({
   monitoring,
   systemStatus,
   requests,
+  workflows,
+  approvals,
+  auditLogs,
   activeWorkflows,
   pendingApprovals,
   completedWorkflows,
-  auditLogs,
 }) {
   return (
     <section className="page-content">
       <div className="page-heading">
         <div>
           <h3>System Monitoring</h3>
+
           <p>
-            Platform health and operational
-            metrics
+            Real-time platform operational health
           </p>
         </div>
+
+        <StatusBadge
+          status={systemStatus}
+        />
       </div>
 
       <div className="monitoring-grid">
-        <MonitorCard
+        <MonitoringCard
           title="System Status"
           value={systemStatus}
-          description="Current platform health"
-          healthy
+          icon="◉"
         />
 
-        <MonitorCard
+        <MonitoringCard
           title="Total Requests"
-          value={
-            monitoring?.total_requests ??
-            requests.length
-          }
-          description="Requests in the platform"
+          value={requests.length}
+          icon="◈"
         />
 
-        <MonitorCard
+        <MonitoringCard
           title="Active Workflows"
-          value={
-            monitoring?.active_workflows ??
-            activeWorkflows
-          }
-          description="Currently running workflows"
+          value={activeWorkflows}
+          icon="⚙"
         />
 
-        <MonitorCard
-          title="Pending Reviews"
-          value={
-            monitoring?.pending_approvals ??
-            pendingApprovals
-          }
-          description="Awaiting human decisions"
+        <MonitoringCard
+          title="Completed"
+          value={completedWorkflows}
+          icon="✓"
         />
 
-        <MonitorCard
-          title="Completed Workflows"
-          value={
-            monitoring?.completed_workflows ??
-            completedWorkflows
-          }
-          description="Successfully completed"
+        <MonitoringCard
+          title="Pending Approvals"
+          value={pendingApprovals}
+          icon="!"
         />
 
-        <MonitorCard
-          title="Total Audit Events"
-          value={
-            monitoring?.total_audit_logs ??
-            auditLogs.length
-          }
-          description="Recorded platform activity"
+        <MonitoringCard
+          title="Audit Events"
+          value={auditLogs.length}
+          icon="◷"
         />
       </div>
 
       <div className="panel full-panel">
         <div className="panel-header">
           <div>
-            <h3>Monitoring Summary</h3>
+            <h3>Monitoring Details</h3>
+
             <p>
-              Live information returned by the
-              AURIXA monitoring service
+              Backend monitoring summary
             </p>
           </div>
         </div>
 
-        <MonitoringDetails
-          monitoring={monitoring}
+        {!monitoring ||
+        Object.keys(monitoring).length === 0 ? (
+          <div className="empty-state">
+            Monitoring data is unavailable.
+          </div>
+        ) : (
+          <div className="monitoring-details">
+            {Object.entries(monitoring).map(
+              ([key, value]) => (
+                <div
+                  className="monitoring-detail"
+                  key={key}
+                >
+                  <span>
+                    {key
+                      .replaceAll("_", " ")
+                      .replace(
+                        /\b\w/g,
+                        (char) =>
+                          char.toUpperCase()
+                      )}
+                  </span>
+
+                  <strong>
+                    {typeof value ===
+                    "object"
+                      ? JSON.stringify(value)
+                      : String(value)}
+                  </strong>
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="panel full-panel">
+        <div className="panel-header">
+          <div>
+            <h3>Workflow Inventory</h3>
+
+            <p>
+              Current workflow execution records
+            </p>
+          </div>
+        </div>
+
+        <WorkflowTable
+          workflows={workflows.slice(0, 10)}
         />
+      </div>
+
+      <div className="panel full-panel">
+        <div className="panel-header">
+          <div>
+            <h3>Approval Inventory</h3>
+
+            <p>
+              Current approval records
+            </p>
+          </div>
+        </div>
+
+        <div className="monitoring-details">
+          <div className="monitoring-detail">
+            <span>Total Approvals</span>
+
+            <strong>
+              {approvals.length}
+            </strong>
+          </div>
+
+          <div className="monitoring-detail">
+            <span>Pending Approvals</span>
+
+            <strong>
+              {pendingApprovals}
+            </strong>
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
-function MonitorCard({
+function MonitoringCard({
   title,
   value,
-  description,
-  healthy = false,
+  icon,
 }) {
   return (
-    <div className="monitor-card">
-      <p className="monitor-card-title">
-        {title}
-      </p>
+    <div className="monitoring-card">
+      <span>{icon}</span>
 
-      <h3
-        className={
-          healthy ? "healthy-status" : ""
-        }
-      >
-        {value}
-      </h3>
+      <div>
+        <small>{title}</small>
 
-      <span>{description}</span>
+        <strong>{value}</strong>
+      </div>
     </div>
   );
 }
 
-function MonitoringDetails({
-  monitoring,
-}) {
-  const data =
-    monitoring &&
-    typeof monitoring === "object"
-      ? monitoring
-      : {};
+// ========================================
+// STATUS BADGE
+// ========================================
 
-  const entries = Object.entries(data);
-
-  if (!entries.length) {
-    return (
-      <div className="empty-state">
-        Monitoring information is not available.
-      </div>
-    );
-  }
+function StatusBadge({ status }) {
+  const normalized =
+    normalizeStatus(status);
 
   return (
-    <div className="monitoring-details">
-      {entries.map(([key, value]) => {
-        const label = key
-          .replaceAll("_", " ")
-          .replace(/\b\w/g, (char) =>
-            char.toUpperCase()
-          );
-
-        const displayValue =
-          value === null ||
-          value === undefined
-            ? "-"
-            : typeof value === "object"
-              ? formatRecommendation(value)
-              : String(value);
-
-        return (
-          <div
-            className="monitoring-detail-item"
-            key={key}
-          >
-            <span>{label}</span>
-            <strong>{displayValue}</strong>
-          </div>
-        );
-      })}
-    </div>
+    <span
+      className={`status-badge ${getStatusClass(
+        normalized
+      )}`}
+    >
+      {formatText(status, "Unknown")}
+    </span>
   );
 }
 
-function WorkflowTable({ workflows }) {
-  if (!workflows?.length) {
-    return (
-      <div className="empty-state">
-        No workflow executions found.
-      </div>
-    );
-  }
-
-  return (
-    <div className="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Workflow</th>
-            <th>Status</th>
-            <th>Current Step</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {workflows.map(
-            (workflow, index) => (
-              <tr
-                key={
-                  workflow?.id ||
-                  workflow?.execution_id ||
-                  index
-                }
-              >
-                <td>
-                  {getWorkflowName(workflow)}
-                </td>
-
-                <td>
-                  <StatusBadge
-                    status={workflow?.status}
-                  />
-                </td>
-
-                <td>
-                  {getWorkflowStep(workflow)}
-                </td>
-
-                <td>
-                  {formatDate(
-                    getWorkflowDate(workflow)
-                  )}
-                </td>
-              </tr>
-            )
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+// ========================================
+// REQUEST MODAL
+// ========================================
 
 function RequestModal({
   requestForm,
@@ -2604,26 +3452,20 @@ function RequestModal({
 }) {
   return (
     <div className="modal-overlay">
-      <div className="modal request-modal">
+      <div className="modal">
         <div className="modal-header">
           <div>
-            <span className="modal-label">
-              NEW AUTOMATION
-            </span>
-
-            <h2>
-              Create Enterprise Request
-            </h2>
+            <h3>Create New Request</h3>
 
             <p>
-              Tell AURIXA what you want to
-              automate.
+              Submit an enterprise automation
+              request
             </p>
           </div>
 
           <button
             type="button"
-            className="close-button"
+            className="modal-close"
             onClick={closeRequestModal}
           >
             ×
@@ -2631,16 +3473,16 @@ function RequestModal({
         </div>
 
         <form
-          onSubmit={handleCreateRequest}
           className="request-form"
+          onSubmit={handleCreateRequest}
         >
           {requestMessage && (
             <div
-              className={`form-message ${
+              className={
                 requestMessageType === "error"
-                  ? "form-error"
-                  : "form-success"
-              }`}
+                  ? "form-message form-error"
+                  : "form-message form-success"
+              }
             >
               {requestMessage}
             </div>
@@ -2651,7 +3493,7 @@ function RequestModal({
 
             <input
               type="text"
-              placeholder="Example: Generate monthly sales report"
+              placeholder="Enter request title"
               value={requestForm.title}
               onChange={(event) =>
                 updateRequestForm(
@@ -2664,12 +3506,10 @@ function RequestModal({
           </div>
 
           <div className="form-group">
-            <label>
-              What should AURIXA do?
-            </label>
+            <label>Description</label>
 
             <textarea
-              placeholder="Describe the task, expected result, and important requirements..."
+              placeholder="Describe the request..."
               value={
                 requestForm.description
               }
@@ -2701,14 +3541,17 @@ function RequestModal({
                 <option value="general">
                   General
                 </option>
+
                 <option value="automation">
                   Automation
                 </option>
-                <option value="analysis">
-                  Analysis
+
+                <option value="research">
+                  Research
                 </option>
+
                 <option value="document">
-                  Document Processing
+                  Document
                 </option>
               </select>
             </div>
@@ -2717,7 +3560,9 @@ function RequestModal({
               <label>Priority</label>
 
               <select
-                value={requestForm.priority}
+                value={
+                  requestForm.priority
+                }
                 onChange={(event) =>
                   updateRequestForm(
                     "priority",
@@ -2728,14 +3573,17 @@ function RequestModal({
                 <option value="low">
                   Low
                 </option>
+
                 <option value="medium">
                   Medium
                 </option>
+
                 <option value="high">
                   High
                 </option>
-                <option value="critical">
-                  Critical
+
+                <option value="urgent">
+                  Urgent
                 </option>
               </select>
             </div>
@@ -2744,20 +3592,19 @@ function RequestModal({
           <div className="modal-actions">
             <button
               type="button"
-              className="cancel-button"
+              className="secondary-button"
               onClick={closeRequestModal}
-              disabled={creatingRequest}
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="create-button"
+              className="primary-button"
               disabled={creatingRequest}
             >
               {creatingRequest
-                ? "Creating Request..."
+                ? "Creating..."
                 : "Create Request"}
             </button>
           </div>
@@ -2767,16 +3614,127 @@ function RequestModal({
   );
 }
 
-function StatusBadge({ status }) {
-  const normalizedStatus =
-    getStatusClass(status);
+// ========================================
+// JOB MODAL
+// ========================================
 
+function JobModal({
+  jobForm,
+  setJobForm,
+  handleScheduleJob,
+  schedulingJob,
+  closeJobModal,
+}) {
   return (
-    <span
-      className={`status-badge ${normalizedStatus}`}
-    >
-      {formatText(status, "unknown")}
-    </span>
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <div>
+            <h3>
+              Schedule Background Job
+            </h3>
+
+            <p>
+              Create a new background execution
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="modal-close"
+            onClick={closeJobModal}
+          >
+            ×
+          </button>
+        </div>
+
+        <form
+          className="request-form"
+          onSubmit={handleScheduleJob}
+        >
+          <div className="form-group">
+            <label>Job Name</label>
+
+            <input
+              type="text"
+              placeholder="Enter job name"
+              value={jobForm.name}
+              onChange={(event) =>
+                setJobForm((previous) => ({
+                  ...previous,
+                  name: event.target.value,
+                }))
+              }
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Job Type</label>
+
+            <select
+              value={jobForm.job_type}
+              onChange={(event) =>
+                setJobForm((previous) => ({
+                  ...previous,
+                  job_type:
+                    event.target.value,
+                }))
+              }
+            >
+              <option value="workflow">
+                Workflow
+              </option>
+
+              <option value="automation">
+                Automation
+              </option>
+
+              <option value="processing">
+                Processing
+              </option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>
+              Payload JSON (Optional)
+            </label>
+
+            <textarea
+              placeholder='{"key":"value"}'
+              value={jobForm.payload}
+              onChange={(event) =>
+                setJobForm((previous) => ({
+                  ...previous,
+                  payload: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={closeJobModal}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={schedulingJob}
+            >
+              {schedulingJob
+                ? "Scheduling..."
+                : "Schedule Job"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
