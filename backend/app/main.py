@@ -16,22 +16,19 @@ from app.api.workflows import router as workflows_router
 from app.api.background_jobs import router as background_jobs_router
 from app.api.feedback import router as feedback_router
 
-from app.core.database import close_database
+from app.core.database import close_database, init_database
 
-
-# ==========================================
-# APPLICATION LIFESPAN
-# ==========================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create database tables when application starts
+    await init_database()
+
     yield
+
+    # Close database connection when application stops
     await close_database()
 
-
-# ==========================================
-# FASTAPI APPLICATION
-# ==========================================
 
 app = FastAPI(
     title="AURIXA",
@@ -47,8 +44,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://aurixa-k22m.onrender.com",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

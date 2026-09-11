@@ -5,15 +5,9 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
-
-
-class Base(DeclarativeBase):
-    """Base class for all AURIXA database models."""
-
-    pass
+from app.models.models import Base
 
 
 engine = create_async_engine(
@@ -36,6 +30,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+async def init_database() -> None:
+    """Create all database tables."""
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
 
 
 async def close_database() -> None:
