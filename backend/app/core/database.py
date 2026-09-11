@@ -1,5 +1,3 @@
-from collections.abc import AsyncGenerator
-
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -7,12 +5,11 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import settings
-from app.models.models import Base
 
 
 engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
+    settings.DATABASE_URL,
+    echo=False,
 )
 
 
@@ -23,20 +20,22 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db():
     async with AsyncSessionLocal() as session:
         try:
             yield session
-        except Exception:
-            await session.rollback()
-            raise
+        finally:
+            await session.close()
 
 
-async def init_database() -> None:
-    """Create all database tables."""
+async def init_database():
+    from app.models.models import Base
+
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+        await connection.run_sync(
+            Base.metadata.create_all
+        )
 
 
-async def close_database() -> None:
+async def close_database():
     await engine.dispose()
