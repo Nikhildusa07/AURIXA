@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -7,60 +6,89 @@ from passlib.context import CryptContext
 from app.core.config import settings
 
 
+# Use PBKDF2-SHA256 instead of bcrypt.
+# This avoids the bcrypt 72-byte compatibility issue occurring on the server.
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["pbkdf2_sha256"],
     deprecated="auto",
 )
 
 
 def hash_password(password: str) -> str:
+    """
+    Hash a user's password securely.
+    """
+
+    if not isinstance(password, str):
+        password = str(password)
+
     return pwd_context.hash(password)
 
 
-def verify_password(password: str, password_hash: str) -> bool:
-    return pwd_context.verify(password, password_hash)
+def verify_password(
+    plain_password: str,
+    hashed_password: str,
+) -> bool:
+    """
+    Verify a plain password against its stored hash.
+    """
+
+    if not isinstance(plain_password, str):
+        plain_password = str(plain_password)
+
+    if not hashed_password:
+        return False
+
+    return pwd_context.verify(
+        plain_password,
+        hashed_password,
+    )
 
 
 def create_access_token(
     subject: str,
-    expires_minutes: int | None = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
-    expire_minutes = (
-        expires_minutes
-        if expires_minutes is not None
-        else settings.access_token_expire_minutes
-    )
+    """
+    Create a JWT access token.
+    """
 
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=expire_minutes
-    )
+    if expires_delta:
+        expire = (
+            datetime.now(timezone.utc)
+            + expires_delta
+        )
+    else:
+        expire = (
+            datetime.now(timezone.utc)
+            + timedelta(
+                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            )
+        )
 
-    payload: dict[str, Any] = {
-        "sub": subject,
+    payload = {
+        "sub": str(subject),
         "exp": expire,
     }
 
     return jwt.encode(
         payload,
-        settings.secret_key,
-        algorithm="HS256",
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
     )
 
 
-def decode_access_token(token: str) -> str | None:
+def decode_access_token(token: str) -> dict | None:
+    """
+    Decode and validate a JWT access token.
+    """
+
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
-            settings.secret_key,
-            algorithms=["HS256"],
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
         )
-
-        subject = payload.get("sub")
-
-        if not isinstance(subject, str) or not subject:
-            return None
-
-        return subject
 
     except JWTError:
         return None
