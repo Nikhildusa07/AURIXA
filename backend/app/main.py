@@ -42,6 +42,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://aurixa-k22m.onrender.com",
         # Add your deployed frontend URL here after deployment
         # "https://your-frontend-url.onrender.com",
     ],
