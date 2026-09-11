@@ -19,11 +19,19 @@ from app.api.feedback import router as feedback_router
 from app.core.database import close_database
 
 
+# ==========================================
+# APPLICATION LIFESPAN
+# ==========================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
     await close_database()
 
+
+# ==========================================
+# FASTAPI APPLICATION
+# ==========================================
 
 app = FastAPI(
     title="AURIXA",
@@ -39,14 +47,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://aurixa-k22m.onrender.com",
-        # Add your deployed frontend URL here after deployment
-        # "https://your-frontend-url.onrender.com",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
