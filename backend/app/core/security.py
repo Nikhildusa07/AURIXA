@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -29,7 +28,6 @@ def hash_password(password: str) -> str:
     if not password:
         raise ValueError("Password cannot be empty")
 
-    # bcrypt supports a maximum of 72 bytes.
     if len(password.encode("utf-8")) > 72:
         raise ValueError(
             "Password cannot be longer than 72 bytes"
@@ -95,12 +93,11 @@ def create_access_token(subject: str) -> str:
 # DECODE JWT ACCESS TOKEN
 # ============================================================
 
-def decode_access_token(token: str) -> Optional[str]:
+def decode_access_token(token: str) -> str | None:
     """
     Decode and validate a JWT access token.
 
-    Returns the user ID stored in the JWT 'sub' claim.
-    Returns None if the token is invalid or expired.
+    Returns the user ID stored in the JWT subject.
     """
 
     try:

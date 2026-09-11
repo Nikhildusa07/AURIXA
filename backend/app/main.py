@@ -25,12 +25,10 @@ from app.core.database import close_database, init_database
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create database tables when the application starts
     await init_database()
 
     yield
 
-    # Close database connections when the application stops
     await close_database()
 
 
@@ -52,25 +50,27 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=[
-        # Vite local development
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-
-        # Alternative Vite ports
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "http://localhost:5175",
         "http://127.0.0.1:5175",
-
-        # Alternative local frontend ports
         "http://localhost:3000",
         "http://127.0.0.1:3000",
 
-        # Render deployment
+        # Render backend
         "https://aurixa-k22m.onrender.com",
+
+        # Your current Vercel frontend
+        "https://frontend-omega-lovat-53.vercel.app",
     ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+
+    # Allow all Vercel deployments for this project
+    allow_origin_regex=r"https://.*\.vercel\.app",
+
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
