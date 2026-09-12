@@ -2564,14 +2564,97 @@ function AgentsPage({
               orchestration result.
             </div>
           ) : (
-            <div className="agent-result">
-              <pre>
-                {JSON.stringify(
-                  agentResult,
-                  null,
-                  2
-                )}
-              </pre>
+            <div className="agent-result professional-agent-result">
+              <div className="agent-result-header">
+                <div>
+                  <h4>Agent Orchestration Completed</h4>
+                  <p>AI analysis and execution recommendation</p>
+                </div>
+                <span className="status-badge status-completed">
+                  Completed
+                </span>
+              </div>
+
+              <div className="agent-result-grid">
+                <div className="agent-result-card">
+                  <span>Request Type</span>
+                  <strong>
+                    {agentResult.request_type || "Not available"}
+                  </strong>
+                </div>
+
+                <div className="agent-result-card">
+                  <span>Classification Confidence</span>
+                  <strong>
+                    {agentResult.classification_confidence
+                      ? `${Math.round(agentResult.classification_confidence * 100)}%`
+                      : "Not available"}
+                  </strong>
+                </div>
+
+                <div className="agent-result-card">
+                  <span>Recommended Action</span>
+                  <strong>
+                    {agentResult.action || "Not available"}
+                  </strong>
+                </div>
+
+                <div className="agent-result-card">
+                  <span>Selected Tool</span>
+                  <strong>
+                    {agentResult.tool_name || "Not available"}
+                  </strong>
+                </div>
+
+                <div className="agent-result-card">
+                  <span>Approval Required</span>
+                  <strong>
+                    {agentResult.requires_approval ? "Yes" : "No"}
+                  </strong>
+                </div>
+
+                <div className="agent-result-card">
+                  <span>Validation Status</span>
+                  <strong>
+                    {agentResult.validation?.valid
+                      ? "? Valid"
+                      : "Requires Review"}
+                  </strong>
+                </div>
+              </div>
+
+              {agentResult.validation && (
+                <div className="agent-validation-section">
+                  <h4>Validation Details</h4>
+
+                  <div className="agent-validation-row">
+                    <span>Confidence</span>
+                    <strong>
+                      {agentResult.validation.confidence
+                        ? `${Math.round(agentResult.validation.confidence * 100)}%`
+                        : "Not available"}
+                    </strong>
+                  </div>
+
+                  <div className="agent-validation-row">
+                    <span>Human Review</span>
+                    <strong>
+                      {agentResult.validation.requires_human
+                        ? "Required"
+                        : "Not Required"}
+                    </strong>
+                  </div>
+
+                  <div className="agent-validation-row">
+                    <span>Issues</span>
+                    <strong>
+                      {agentResult.validation.issues?.length
+                        ? agentResult.validation.issues.join(", ")
+                        : "No issues found"}
+                    </strong>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -3735,4 +3818,5 @@ function JobModal({
 }
 
 export default App;
+
 
