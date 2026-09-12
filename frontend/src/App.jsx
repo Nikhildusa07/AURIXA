@@ -421,9 +421,9 @@ function App() {
             getWorkflowExecutions(),
             getApprovals(),
             getAuditLogs(),
-            api.get("/api/v1/background-jobs/"),
-            api.get("/api/v1/analytics/summary"),
-            api.get("/api/v1/analytics/records"),
+            api.get("/background-jobs/"),
+            api.get("/analytics/summary"),
+            api.get("/analytics/records"),
           ]);
 
         if (results[0].status === "fulfilled") {
@@ -576,7 +576,7 @@ function App() {
       setLoginError("");
 
       const response = await api.post(
-        "/api/v1/auth/login",
+        "/auth/login",
         {
           email,
           password,
@@ -629,7 +629,7 @@ function App() {
       setRegisterMessage("");
 
       await api.post(
-        "/api/v1/auth/register",
+        "/auth/register",
         {
           full_name: fullName,
           email,
@@ -711,7 +711,7 @@ function App() {
       setRequestMessage("");
 
       await api.post(
-        "/api/v1/requests",
+        "/requests",
         requestForm
       );
 
@@ -826,7 +826,7 @@ function App() {
       setAgentResult(null);
 
       const response = await api.post(
-        "/api/v1/agents/orchestrate",
+        "/agents/orchestrate",
         {
           task: agentForm.task,
           context: agentForm.context || undefined,
@@ -859,7 +859,7 @@ function App() {
   const loadBackgroundJobs = async () => {
     try {
       const response = await api.get(
-        "/api/v1/background-jobs/"
+        "/background-jobs/"
       );
 
       setBackgroundJobs(
@@ -903,7 +903,7 @@ function App() {
       }
 
       await api.post(
-        "/api/v1/background-jobs/schedule",
+        "/background-jobs/schedule",
         {
           job_type: jobForm.job_type,
           name: jobForm.name,
@@ -2645,7 +2645,7 @@ function BackgroundJobsPage({
           }
           onClick={() =>
             handleJobAction(
-              "/api/v1/background-jobs/run-next",
+              "/background-jobs/run-next",
               "run-next"
             )
           }
@@ -2663,7 +2663,7 @@ function BackgroundJobsPage({
           }
           onClick={() =>
             handleJobAction(
-              "/api/v1/background-jobs/pause",
+              "/background-jobs/pause",
               "pause"
             )
           }
@@ -2679,7 +2679,7 @@ function BackgroundJobsPage({
           }
           onClick={() =>
             handleJobAction(
-              "/api/v1/background-jobs/resume",
+              "/background-jobs/resume",
               "resume"
             )
           }
@@ -2772,7 +2772,7 @@ function BackgroundJobsPage({
                                   }
                                   onClick={() =>
                                     handleJobAction(
-                                      `/api/v1/background-jobs/${jobId}/retry`,
+                                      `/background-jobs/${jobId}/retry`,
                                       `retry-${jobId}`
                                     )
                                   }
@@ -2788,7 +2788,7 @@ function BackgroundJobsPage({
                                   }
                                   onClick={() =>
                                     handleJobAction(
-                                      `/api/v1/background-jobs/${jobId}/complete`,
+                                      `/background-jobs/${jobId}/complete`,
                                       `complete-${jobId}`
                                     )
                                   }
