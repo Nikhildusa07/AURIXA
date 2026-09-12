@@ -1,7 +1,6 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 
@@ -11,6 +10,7 @@ class BackgroundJob:
     name: str
     priority: int
     status: str
+    payload: dict[str, Any] = field(default_factory=dict)
     duplicate_key: str | None = None
     error_message: str | None = None
     created_at: datetime | None = None
@@ -24,6 +24,7 @@ class BackgroundJobManager:
     def create_job(
         self,
         name: str,
+        payload: dict[str, Any] | None = None,
         priority: int = 5,
         duplicate_key: str | None = None,
     ) -> BackgroundJob:
@@ -42,6 +43,7 @@ class BackgroundJobManager:
             name=name,
             priority=priority,
             status="pending",
+            payload=payload or {},
             duplicate_key=duplicate_key,
             created_at=datetime.now(timezone.utc),
         )
