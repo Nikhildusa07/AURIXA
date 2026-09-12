@@ -826,11 +826,7 @@ function App() {
       setAgentResult(null);
 
       const response = await api.post(
-        "/agents/orchestrate",
-        {
-          task: agentForm.task,
-          context: agentForm.context || undefined,
-        }
+        `/agents/orchestrate?title=${encodeURIComponent(agentForm.task)}&content=${encodeURIComponent(agentForm.context || agentForm.task)}`
       );
 
       setAgentResult(
@@ -3739,3 +3735,4 @@ function JobModal({
 }
 
 export default App;
+
