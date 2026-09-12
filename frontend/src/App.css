@@ -1834,3 +1834,136 @@ td {
     width: 100%;
   }
 }
+/* ========================================
+   PROFESSIONAL AGENT RESULT UI
+======================================== */
+
+.professional-agent-result {
+  max-height: none;
+  overflow: visible;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  color: #1e293b;
+}
+
+.agent-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 22px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.agent-result-header h4 {
+  margin: 0 0 6px;
+  color: #1e293b;
+  font-size: 20px;
+}
+
+.agent-result-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.status-badge.status-completed {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.agent-result-card {
+  padding: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.agent-result-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-result-card strong {
+  display: block;
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.agent-validation-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.agent-validation-section h4 {
+  margin: 0 0 16px;
+  color: #1e293b;
+  font-size: 16px;
+}
+
+.agent-validation-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.agent-validation-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.agent-validation-row span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.agent-validation-row strong {
+  color: #1e293b;
+  font-size: 14px;
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .agent-result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-result-header {
+    flex-direction: column;
+  }
+
+  .agent-validation-row {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .agent-validation-row strong {
+    text-align: left;
+  }
+}
