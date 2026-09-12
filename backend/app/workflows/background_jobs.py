@@ -14,12 +14,15 @@ class BackgroundJob:
     duplicate_key: str | None = None
     error_message: str | None = None
     created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
 
 class BackgroundJobManager:
     def __init__(self) -> None:
         self.jobs: list[BackgroundJob] = []
         self.dead_letter_jobs: list[BackgroundJob] = []
+        self.paused: bool = False
 
     def create_job(
         self,
@@ -71,6 +74,57 @@ class BackgroundJobManager:
 
         return None
 
+    def get_next_job(self) -> BackgroundJob | None:
+        if self.paused:
+            return None
+
+        pending_jobs = [
+            job
+            for job in self.jobs
+            if job.status == "pending"
+        ]
+
+        if not pending_jobs:
+            return None
+
+        return sorted(
+            pending_jobs,
+            key=lambda job: job.priority,
+        )[0]
+
+    def start_job(
+        self,
+        job_id: str,
+    ) -> BackgroundJob:
+        job = self.get_job(job_id)
+
+        if job is None:
+            raise ValueError("Background job not found.")
+
+        if job.status != "pending":
+            raise ValueError(
+                "Only pending jobs can be started."
+            )
+
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
+
+        return job
+
+    def complete_job(
+        self,
+        job_id: str,
+    ) -> BackgroundJob:
+        job = self.get_job(job_id)
+
+        if job is None:
+            raise ValueError("Background job not found.")
+
+        job.status = "completed"
+        job.completed_at = datetime.now(timezone.utc)
+
+        return job
+
     def retry_job(
         self,
         job_id: str,
@@ -87,6 +141,8 @@ class BackgroundJobManager:
 
         job.status = "pending"
         job.error_message = None
+        job.started_at = None
+        job.completed_at = None
 
         if job in self.dead_letter_jobs:
             self.dead_letter_jobs.remove(job)
@@ -105,11 +161,18 @@ class BackgroundJobManager:
 
         job.status = "failed"
         job.error_message = error_message
+        job.completed_at = datetime.now(timezone.utc)
 
         if job not in self.dead_letter_jobs:
             self.dead_letter_jobs.append(job)
 
         return job
+
+    def pause(self) -> None:
+        self.paused = True
+
+    def resume(self) -> None:
+        self.paused = False
 
 
 background_job_manager = BackgroundJobManager()
