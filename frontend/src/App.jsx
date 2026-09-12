@@ -884,27 +884,14 @@ function App() {
       setSchedulingJob(true);
       setJobsMessage("");
 
-      let parsedPayload = {};
-
-      if (jobForm.payload.trim()) {
-        try {
-          parsedPayload = JSON.parse(
-            jobForm.payload
-          );
-        } catch {
-          throw new Error(
-            "Payload must be valid JSON."
-          );
-        }
+      if (!jobForm.name.trim()) {
+        throw new Error("Job name is required.");
       }
 
       await api.post(
-        "/background-jobs/schedule",
-        {
-          job_type: jobForm.job_type,
-          name: jobForm.name,
-          payload: parsedPayload,
-        }
+        `/background-jobs/schedule?name=${encodeURIComponent(
+          jobForm.name.trim()
+        )}`
       );
 
       setJobsMessage(
@@ -3818,5 +3805,6 @@ function JobModal({
 }
 
 export default App;
+
 
 
